@@ -1,0 +1,51 @@
+//import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/common/PageHeader";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { getApiErrorMessage } from "@/lib/api/api-error";
+import { TenantUserForm } from "@/features/tenant-users/components/TenantUserForm";
+import { useCreateTenantUser } from "@/features/tenant-users/hooks/useCreateTenantUser";
+import type { TenantUserFormValues } from "@/features/tenant-users/schemas/tenant-user.schema";
+import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
+
+export function CreateTenantUserPage() {
+  //const navigate = useNavigate();
+  const createTenantUserMutation = useCreateTenantUser();
+  const { navigateToApp } = useTenantNavigation();
+  const { appPath } = useTenantNavigation();
+
+  function handleSubmit(values: TenantUserFormValues) {
+    createTenantUserMutation.mutate(values, {
+      onSuccess: (tenantUser) => {
+        toast.success("Member created successfully");
+        navigateToApp(`/members/${tenantUser.id}`);
+      },
+    });
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Add Member"
+        description="Create a user account and membership within the current tenant."
+        backTo={appPath("/members")}
+        backLabel="Back to Members"
+      />
+
+      {createTenantUserMutation.isError ? (
+        <div className="mb-6">
+          <ErrorState
+            title="Could not create member"
+            description={getApiErrorMessage(createTenantUserMutation.error)}
+          />
+        </div>
+      ) : null}
+
+      <TenantUserForm
+        onSubmit={handleSubmit}
+        isLoading={createTenantUserMutation.isPending}
+        submitLabel="Create Member"
+      />
+    </div>
+  );
+}

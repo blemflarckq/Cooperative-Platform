@@ -1,0 +1,10 @@
+{
+    "$schema": "https://json.schemastore.org/nest-cli",
+    "collection": "@nestjs/schematics",
+    "sourceRoot": "apps/api/seed",
+    "entryFile": "seed",
+    "compilerOptions": {
+        "deleteOutDir": false,
+        "tsConfigPath": "apps/coop-platform/tsconfig.app.json"
+    }
+}
