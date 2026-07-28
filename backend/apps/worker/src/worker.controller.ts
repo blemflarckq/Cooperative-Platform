@@ -1,12 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { WorkerService } from './worker.service';
 
-@Controller()
+@Controller('health')
 export class WorkerController {
-  constructor(private readonly workerService: WorkerService) {}
-
   @Get()
-  getHello(): string {
-    return this.workerService.getHello();
+  health() {
+    return { status: 'ok', service: 'worker', timestamp: new Date().toISOString() };
   }
 }

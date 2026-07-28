@@ -15,6 +15,7 @@ import {
   LoanMode,
   PayoutMode,
   SchemeStatus,
+  SchemeVisibilityMode,
 } from "../enums/scheme.enums";
 
 @Entity("cooperative_schemes")
@@ -71,6 +72,18 @@ export class CooperativeScheme extends BaseEntity {
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;
+
+  /**
+   * Configurable by the group's leader — see SchemeVisibilityMode.
+   * Defaults to full transparency, matching the platform's baseline
+   * trust-and-transparency posture; a leader can opt into ranking mode.
+   */
+  @Column({
+    type: "enum",
+    enum: SchemeVisibilityMode,
+    default: SchemeVisibilityMode.FULL_TRANSPARENCY,
+  })
+  visibilityMode!: SchemeVisibilityMode;
 
   @Column({ type: "timestamptz", nullable: true })
   activatedAt!: Date | null;

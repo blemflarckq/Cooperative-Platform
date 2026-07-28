@@ -1,4 +1,4 @@
-import { CheckCircle2, Pencil, Plus } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -170,6 +170,16 @@ export function SchemeDetailsPage() {
         backLabel={backLabel}
         actions={
           <div className="flex flex-wrap gap-2">
+            <PermissionGate permissions={["outbound-request:read"]}>
+              <Button
+                variant="outline"
+                onClick={() => navigate(appPath(`/schemes/${scheme.id}/approvals`))}
+              >
+                <ClipboardCheck className="mr-2 size-4" />
+                {isCommunityMode ? "Waiting on you" : "Approvals"}
+              </Button>
+            </PermissionGate>
+
             <PermissionGate permissions={["scheme:update"]}>
               <Button
                 variant="outline"

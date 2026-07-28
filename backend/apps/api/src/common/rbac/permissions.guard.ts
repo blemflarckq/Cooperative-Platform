@@ -36,10 +36,9 @@ export class PermissionsGuard implements CanActivate {
 
     const req = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
     const userPerms: string[] = req.user?.permissions ?? [];
-    const set = new Set(userPerms); 
-    console.log(`This has these permission ${userPerms}`);
+    const set = new Set(userPerms); //Searching through a set is much faster 0(1)
 
-    const ok = required.every((p) => set.has(p)); //Searching through a set is much faster 0(1)
+    const ok = required.every((p) => set.has(p));
     if (!ok) throw new ForbiddenException("Insufficient permissions");
 
     return true;

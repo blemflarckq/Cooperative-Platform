@@ -1,10 +1,8 @@
-import { Scope, CanActivate, ExecutionContext, ForbiddenException, Injectable, Inject, OnModuleInit  } from "@nestjs/common";
-import { TenantContextService } from "./tenant-context.service";
-import { Request } from 'express'; // or 'fastify'
-import { IS_PUBLIC_KEY } from "../auth/public.decorator";
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Scope } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { ModuleRef } from "@nestjs/core";
-import { ContextIdFactory } from '@nestjs/core';
+import { Request } from 'express';
+import { TenantContextService } from "./tenant-context.service";
+import { IS_PUBLIC_KEY } from "../auth/public.decorator";
 
 /**
  * TenantGuard ensures every protected request has a tenant context.
@@ -12,15 +10,14 @@ import { ContextIdFactory } from '@nestjs/core';
  * Rules:
  * - Requires X-Tenant-Id header
  * - If authenticated, JWT tenantId must match header tenantId
- * 
- * Notes:
- * - A gurad must implement the CanACtivate interface to allow or deny a request to proceed to route handler.
- * - This is why it accepts an instance of an ExecutionContext as an argument.
+ *
+ * Guard order (see api.module.ts) is: JwtAuthGuard -> TenantGuard ->
+ * PermissionsGuard. That order is what guarantees req.user is already
+ * populated by the time this guard runs for any non-public route — this
+ * guard does not assume that blindly, and fails safely if it's ever untrue.
  */
-
-// Define what your User object actually looks like
 interface AuthenticatedRequest extends Request {
-  user: {
+  user?: {
     id: string;
     tenantId: string | string[];
     permissions: string[];
@@ -28,50 +25,41 @@ interface AuthenticatedRequest extends Request {
 }
 
 @Injectable({ scope: Scope.REQUEST })
-export class TenantGuard implements CanActivate, OnModuleInit   {
+export class TenantGuard implements CanActivate {
   constructor(
     private readonly tenantCtx: TenantContextService,
     private readonly reflector: Reflector,
-    //private readonly moduleRef: ModuleRef,
-    @Inject(ModuleRef) private moduleRef: ModuleRef,
-  ) {
-    console.log('At this point, the guard has been created.');
-  }
+  ) {}
 
-   onModuleInit() {
-    console.log('TenantGuard reflector?', !!this.reflector);
-  }
-
-  async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    console.log('TenantGuard reflector?', !!this.reflector);
-    console.log('Is Provider defined?', !!this.tenantCtx);
-    //console.log('The hell changed??');
+  canActivate(ctx: ExecutionContext): boolean {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       ctx.getHandler(),
       ctx.getClass(),
     ]);
 
-    console.log('Is the endpoint open to the public', !!isPublic);
-    if(isPublic) return true;
-    
-    const req = ctx.switchToHttp().getRequest<AuthenticatedRequest>(); //Grab the underlying http request
-    
-    const contextId = ContextIdFactory.getByRequest(req);
-    //const tenantCtx = await this.moduleRef.resolve<TenantContextService>(TenantContextService, contextId);
+    if (isPublic) return true;
 
-    //const headerTenantId = req.headers["x-tenant-id"] as string | undefined;
+    const req = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
+
     const { "x-tenant-id": headerTenantId } = req.headers;
 
     if (!headerTenantId) {
       throw new ForbiddenException("Missing X-Tenant-Id header");
     }
 
-    // If request is authenticated, ensure token tenant matches header tenant.
-    if (req.user?.tenantId && req.user.tenantId !== headerTenantId) {
+    // Defensive: this guard expects JwtAuthGuard to have already run and
+    // populated req.user for any non-public route. If that's ever not the
+    // case (e.g. guard order changes), fail closed with a clear error
+    // instead of throwing an unhandled TypeError trying to read req.user.
+    if (!req.user) {
+      throw new ForbiddenException("Request is not authenticated");
+    }
+
+    if (req.user.tenantId && req.user.tenantId !== headerTenantId) {
       throw new ForbiddenException("Token tenant does not match request tenant");
     }
 
-    this.tenantCtx.setTenantId(headerTenantId);
+    this.tenantCtx.setTenantId(headerTenantId as string);
     req.user.tenantId = headerTenantId;
     return true;
   }

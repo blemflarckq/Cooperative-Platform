@@ -8,6 +8,7 @@ import { JwtStrategy } from "./auth/jwt.strategy";
 import { AuditLog } from "./audit/audit-log.entity";
 //import { AuditInterceptor } from "./audit/audit.interceptor";
 import { IdentityModule } from "../modules/identity/identity.module";
+import { getRequiredEnv } from "../config/env";
 
 /**
  * CommonModule hosts cross-cutting concerns:
@@ -22,7 +23,7 @@ import { IdentityModule } from "../modules/identity/identity.module";
     IdentityModule,
     TypeOrmModule.forFeature([AuditLog]),
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: getRequiredEnv("JWT_ACCESS_SECRET"),
       signOptions: { expiresIn: "15m" },
     }),
   ],

@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
 } from "@nestjs/common";
 import { DataSource, EntityManager, In } from "typeorm";
 import { Account } from "../entities/account.entity";
@@ -14,9 +13,9 @@ import {
   JournalLineType,
   JournalSourceModule,
 } from "../enums/journal.enums";
-import { assertPositiveMoneyString } from "../../../common/validation/money";
 import { AccountingOutboxService } from "../services/accounting-outbox.service";
 import { AccountingPeriodsService } from "../services/accounting-periods.service";
+import { validateJournalEntry, normalizeMoney } from "./journal-entry-validation";
 
 export interface PostingLineInput {
   accountId: string;
@@ -53,7 +52,7 @@ export class PostingEngineService {
     manager: EntityManager,
     input: PostJournalEntryInput,
   ): Promise<JournalEntry> {
-    this.validatePostingInput(input);
+    validateJournalEntry(input);
     await this.accountingPeriodsService.assertPostingDateAllowed(
       input.tenantId,
       input.transactionDate,
@@ -104,7 +103,7 @@ export class PostingEngineService {
         journalEntryId: entry.id,
         accountId: line.accountId,
         lineType: line.lineType,
-        amount: this.normalizeMoney(line.amount),
+        amount: normalizeMoney(line.amount),
         memo: line.memo?.trim() || null,
       }),
     );
@@ -147,74 +146,6 @@ export class PostingEngineService {
         },
       },
     });
-  }
-
-  private validatePostingInput(input: PostJournalEntryInput): void {
-    if (!input.tenantId) {
-      throw new BadRequestException("tenantId is required.");
-    }
-
-    if (!input.transactionDate) {
-      throw new BadRequestException("transactionDate is required.");
-    }
-
-    if (!input.description?.trim()) {
-      throw new BadRequestException("description is required.");
-    }
-
-    if (!input.lines || input.lines.length < 2) {
-      throw new BadRequestException(
-        "A journal entry requires at least two lines.",
-      );
-    }
-
-    let debitTotal = 0;
-    let creditTotal = 0;
-
-    for (const line of input.lines) {
-      if (!line.accountId) {
-        throw new BadRequestException("Each journal line requires accountId.");
-      }
-
-      if (
-        line.lineType !== JournalLineType.DEBIT &&
-        line.lineType !== JournalLineType.CREDIT
-      ) {
-        throw new BadRequestException(
-          "Each journal line must be either DEBIT or CREDIT.",
-        );
-      }
-
-      assertPositiveMoneyString(line.amount, "line amount");
-
-      const amount = Number(this.normalizeMoney(line.amount));
-
-      if (line.lineType === JournalLineType.DEBIT) {
-        debitTotal += amount;
-      } else {
-        creditTotal += amount;
-      }
-    }
-
-    if (debitTotal <= 0 || creditTotal <= 0) {
-      throw new BadRequestException(
-        "Journal entry requires both debit and credit lines.",
-      );
-    }
-
-    if (this.toCents(debitTotal) !== this.toCents(creditTotal)) {
-      throw new BadRequestException(
-        "Journal entry is not balanced. Total debits must equal total credits.",
-      );
-    }
-  }
-
-  private normalizeMoney(value: string): string {
-    return Number(value).toFixed(2);
-  }
-
-  private toCents(value: number): number {
-    return Math.round(value * 100);
   }
 
   private async generateEntryNumber(

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import type { AccessTokenPayload, AuthenticatedUser } from "./jwt.types";
+import { getRequiredEnv } from "../../config/env";
 
 /**
  * JWT strategy validates access tokens.
@@ -18,8 +19,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-       // In production, fail fast if secrets are missing.
-      secretOrKey: process.env.JWT_ACCESS_SECRET ?? "dev-insecure-secret",
+      // Fails fast at startup if JWT_ACCESS_SECRET isn't set — never
+      // silently falls back to a known, insecure default.
+      secretOrKey: getRequiredEnv("JWT_ACCESS_SECRET"),
     });
   }
 

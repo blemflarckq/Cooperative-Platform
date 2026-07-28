@@ -96,12 +96,8 @@ export function AppRouter() {
               <Route index element={<SchemesPage />} />
               <Route path="new" element={<CreateSchemePage />} />
               <Route path=":schemeId" element={<SchemeDetailsPage />} />
-            </Route>
-            <Route path="schemes">
-              <Route index element={<SchemesPage />} />
-              <Route path="new" element={<CreateSchemePage />} />
-              <Route path=":schemeId" element={<SchemeDetailsPage />} />
               <Route path=":schemeId/edit" element={<EditSchemePage />} />
+              <Route path=":schemeId/approvals" element={<ApprovalsPage />} />
               <Route
                 path=":schemeId/cycles/new"
                 element={<CreateCyclePage />}
@@ -153,7 +149,6 @@ export function AppRouter() {
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="contributions" element={<ContributionsPage />} />
             <Route path="loans" element={<LoansPage />} />
-            <Route path="approvals" element={<ApprovalsPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="settings" element={<SettingsPage />} />

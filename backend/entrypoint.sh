@@ -1,23 +1,25 @@
 #!/bin/sh
 set -e
 
-echo "⏳ Waiting for Database at ${POSTGRES_HOST}:${POSTGRES_PORT}..."
-
-# Use /dev/tcp (if using bash) or nc (netcat, usually built-in)
-# This loop waits until it can connect to the port
+echo "Waiting for database at ${POSTGRES_HOST}:${POSTGRES_PORT}..."
 while ! nc -z "$POSTGRES_HOST" "$POSTGRES_PORT"; do
   echo "Postgres port is closed - sleeping"
   sleep 2
 done
+echo "Postgres is reachable."
 
-echo "✅ Postgres port is open!"
-
-# Since your seed is likely in the dist folder as an 'asset'
-if [ -f "/app/dist/apps/${TARGET_APP}/seed/seed.ts" ]; then
-    echo "🌱 Running Seed..."
-    #node dist/apps/${TARGET_APP}/src/seed/seed.js
-    npx ts-node /app/dist/apps/${TARGET_APP}/seed/seed.ts
+# Resolve the actual main.js path for the target app. TypeScript's build
+# output shape currently differs between apps (api's cross-app imports from
+# worker cause a deeper nested output for worker) — this checks both known
+# locations rather than assuming one.
+if [ -f "/app/dist/${TARGET_APP}/src/main.js" ]; then
+  MAIN_JS="/app/dist/${TARGET_APP}/src/main.js"
+elif [ -f "/app/dist/main.js" ]; then
+  MAIN_JS="/app/dist/main.js"
+else
+  echo "Could not find main.js for ${TARGET_APP} in expected locations." >&2
+  exit 1
 fi
 
-echo "🚀 Starting ${TARGET_APP}..."
-exec node dist/apps/${TARGET_APP}/main.js
+echo "Starting ${TARGET_APP} (${MAIN_JS})..."
+exec node "$MAIN_JS"

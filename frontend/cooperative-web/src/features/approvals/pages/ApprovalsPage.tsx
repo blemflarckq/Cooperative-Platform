@@ -1,19 +1,96 @@
+import { ClipboardCheck } from "lucide-react";
+import { useParams } from "react-router";
+import { toast } from "sonner";
+
 import { PageHeader } from "@/components/common/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { LoadingState } from "@/components/feedback/LoadingState";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useExperienceMode } from "@/lib/experience/useExperienceMode";
+
+import { OutboundRequestCard } from "../components/OutboundRequestCard";
+import { useRecordApproval } from "../hooks/useRecordApproval";
+import { useSchemeOutboundRequests } from "../hooks/useSchemeOutboundRequests";
 
 export function ApprovalsPage() {
+  const { schemeId } = useParams<{ schemeId: string }>();
+  const { user } = useAuth();
+  const { isCommunityMode } = useExperienceMode();
+  const recordApproval = useRecordApproval();
+
+  const requestsQuery = useSchemeOutboundRequests(schemeId ?? "");
+
+  const pageTitle = isCommunityMode ? "Waiting on you" : "Approvals";
+  const pageDescription = isCommunityMode
+    ? "Requests that need your decision before money can move."
+    : "Outbound requests awaiting the required approvals for this scheme.";
+
+  if (!schemeId) return <ErrorState title="No scheme selected" />;
+  if (requestsQuery.isLoading) return <LoadingState />;
+
+  if (requestsQuery.isError) {
+    return (
+      <ErrorState
+        title={
+          isCommunityMode ? "Could not load your approvals" : "Could not load approvals"
+        }
+      />
+    );
+  }
+
+  const requests = (requestsQuery.data ?? []).filter(
+    (request) => request.status === "INITIATED",
+  );
+
+  function handleDecision(requestId: string, decision: "APPROVED" | "REJECTED") {
+    if (!schemeId) return;
+
+    recordApproval.mutate(
+      { schemeId, requestId, decision },
+      {
+        onSuccess: () => {
+          toast.success(
+            decision === "APPROVED" ? "Approval recorded" : "Request declined",
+          );
+        },
+        onError: (error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : "Something went wrong.";
+          toast.error(message);
+        },
+      },
+    );
+  }
+
   return (
     <div>
-      <PageHeader
-        title="Approvals"
-        description="Manage the cooperative approval roster, approval records, and year-cycle participation."
-      />
+      <PageHeader title={pageTitle} description={pageDescription} />
 
-      <Card className="border-[var(--border)] bg-[var(--card)]">
-        <CardContent className="p-6 text-sm text-[var(--muted-foreground)]">
-          Approvals module scaffolded. Table, filters, and detail view come next.
-        </CardContent>
-      </Card>
+      {requests.length === 0 ? (
+        <EmptyState
+          title={isCommunityMode ? "Nothing waiting on you" : "No pending requests"}
+          description={
+            isCommunityMode
+              ? "When someone in your group needs money released, it will show up here for you to decide on."
+              : "Outbound requests requiring your approval will appear here."
+          }
+          icon={<ClipboardCheck className="size-5" />}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {requests.map((request) => (
+            <OutboundRequestCard
+              key={request.id}
+              request={request}
+              currentUserId={user?.id ?? ""}
+              isSubmitting={recordApproval.isPending}
+              onApprove={() => handleDecision(request.id, "APPROVED")}
+              onDecline={() => handleDecision(request.id, "REJECTED")}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

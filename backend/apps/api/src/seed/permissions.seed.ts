@@ -124,6 +124,8 @@ const PERMISSIONS: Array<{
       { action: "activate", description: "activate tenant scheme" },
       { action: "suspend", description: "suspend tenant scheme" },
       { action: "archive", description: "archive tenant scheme" },
+      { action: "role.read", description: "archive tenant scheme" },
+      { action: "role.assign", description: "archive tenant scheme" },
     ],
   },
 
@@ -321,6 +323,8 @@ const PERMISSIONS: Array<{
     resource: "loan",
     actions: [
       { action: "create", description: "Create loan request" },
+      { action: "request", description: "Create loan request" },
+      { action: "pledge", description: "Create loan request" },
       { action: "read", description: "View own loans" },
       { action: "read.all", description: "View all loans" },
       { action: "issue", description: "Issue loan" },
@@ -329,6 +333,41 @@ const PERMISSIONS: Array<{
       { action: "repay", description: "Record loan repayment" },
     ],
   },
+
+  // =========================
+  // LOAN POLICY
+  // =========================
+  {
+    resource: "laon-policy",
+    actions: [
+      { action: "manage", description: "Manage loan policy" },
+      { action: "read", description: "View loan policy" },
+    ],
+  },
+
+  // =========================
+  // APPROVAL POLICY
+  // =========================
+  {
+    resource: "approval-policy",
+    actions: [
+      { action: "manage", description: "Manage approval policy" },
+      { action: "read", description: "View approval policy" },
+    ],
+  },
+
+  // =========================
+  // OUTBOUND REQUEST
+  // =========================
+  {
+    resource: "outbound-request",
+    actions: [
+      { action: "read", description: "View outbount requests" },
+      { action: "initiate", description: "Trigger an outbound funds reqeuest" },
+      { action: "approve", description: "Approve an outbound funds reqeuest" },
+    ],
+  },
+
 
   // =========================
   // FUNDING REQUESTS

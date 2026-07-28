@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { WorkerController } from './worker.controller';
-import { WorkerService } from './worker.service';
+import { WorkerDatabaseModule } from './database/worker-database.module';
+import { WorkerOutboxModule } from './outbox/worker-outbox.module';
 
 @Module({
-  imports: [],
+  imports: [WorkerDatabaseModule, WorkerOutboxModule],
   controllers: [WorkerController],
-  providers: [WorkerService],
+  providers: [],
 })
 export class WorkerModule {}

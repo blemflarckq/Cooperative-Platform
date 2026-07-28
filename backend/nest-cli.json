@@ -1,16 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/coop-platform/src",
+  "sourceRoot": "apps/api/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
       {"include": "seed/*.ts", "watchAssets": true}
     ],
-    "tsConfigPath": "apps/coop-platform/tsconfig.app.json"
+    "tsConfigPath": "apps/api/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/coop-platform",
+  "root": "apps/api",
   "projects": {
     "api": {
       "type": "application",
@@ -37,15 +37,6 @@
       "sourceRoot": "libs/contracts/src",
       "compilerOptions": {
         "tsConfigPath": "libs/contracts/tsconfig.lib.json"
-      }
-    },
-    "coop-platform": {
-      "type": "application",
-      "root": "apps/coop-platform",
-      "entryFile": "main",
-      "sourceRoot": "apps/coop-platform/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/coop-platform/tsconfig.app.json"
       }
     },
     "worker": {

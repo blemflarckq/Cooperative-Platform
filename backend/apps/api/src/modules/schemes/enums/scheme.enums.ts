@@ -46,3 +46,15 @@ export enum CycleParticipantStatus {
   EXITED = "EXITED",
   REMOVED = "REMOVED",
 }
+
+/**
+ * Controls how contribution activity is surfaced to ordinary members
+ * within a scheme — configurable by the group's leader, not a global
+ * platform setting. FULL_TRANSPARENCY shows individual contribution
+ * amounts across the group; RANKING shows relative standing ("you rank
+ * 5th this cycle") without exposing exact figures.
+ */
+export enum SchemeVisibilityMode {
+  FULL_TRANSPARENCY = "FULL_TRANSPARENCY",
+  RANKING = "RANKING",
+}

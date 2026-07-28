@@ -10,13 +10,25 @@ import { BadRequestException } from "@nestjs/common";
  * - max 2 decimal places
  *
  * We keep money as string because TypeORM numeric/decimal fields return strings.
+ *
+ * By default, null/undefined/empty values are REJECTED — money-moving call
+ * sites (journal lines, contribution amounts) should never silently accept
+ * a missing amount. Pass `{ allowEmpty: true }` only where a missing value
+ * has a genuine, separately-handled meaning (e.g. an optional scheme target
+ * amount) — this must be an explicit, deliberate choice at each call site,
+ * not a silent default.
  */
 export function assertPositiveMoneyString(
   value: string | null | undefined,
   fieldName: string,
+  options?: { allowEmpty?: boolean },
 ): void {
   if (value === null || value === undefined || value === "") {
-    return;
+    if (options?.allowEmpty) {
+      return;
+    }
+
+    throw new BadRequestException(`${fieldName} is required.`);
   }
 
   const normalized = value.trim();

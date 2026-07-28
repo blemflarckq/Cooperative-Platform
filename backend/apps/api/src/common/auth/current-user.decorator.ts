@@ -11,7 +11,6 @@ export const CurrentUser = createParamDecorator(
     
     // We look for 'tenantId' which we will attach in the Guard below
     const currentUser = request.user.sub;
-    console.log(`UserID picked by the current user decorator ${currentUser}`);
 
     if (!currentUser) {
       throw new InternalServerErrorException(

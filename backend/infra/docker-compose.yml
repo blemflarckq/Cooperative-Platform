@@ -3,6 +3,7 @@ name: coop-platform
 services:
   # --- THE APPLICATION ---
   api:
+    profiles: ["containerized"]
     build:
       context: ../
       dockerfile: Dockerfile
@@ -24,6 +25,7 @@ services:
         condition: service_healthy
 
   worker:
+    profiles: ["containerized"]
     build:
       context: ../
       dockerfile: Dockerfile

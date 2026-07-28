@@ -16,6 +16,7 @@ import { Tenant } from "../../modules/identity/entities/tenant.entity";
 import { TenantUser } from "../../modules/identity/entities/tenant-user.entity";
 import { TenantUserRole } from "../../modules/identity/entities/tenant-user-role.entity";
 import { hashPassword } from '../../common/auth/password';
+import { getRequiredEnv } from "../../config/env";
 
 /**
  * AuthService is tenant-aware:
@@ -78,8 +79,6 @@ export class AuthService {
   }): Promise<LoginResponse> {
     const email = params.email.trim().toLowerCase();
     const tenantSlug = params.tenantSlug.trim().toLowerCase();
-    //const { email, password, tenantSlug } = params; 
-    console.log('Beginning Authentication \n');
 
     const tenant = await this.tenants.createQueryBuilder("tenant")
       .where("tenant.slug = :slug", {slug: tenantSlug})
@@ -89,9 +88,6 @@ export class AuthService {
     if (!tenant) {
       throw new UnauthorizedException("Invalid tenant or tenant inactive");
     }
-
-    console.log("This is the current tenant slug", tenantSlug);
-    //console.log("But for some reason gets this tenant", tenant);
 
     const user = await this.users.createQueryBuilder("user")
       .where("user.email = :email", { email })
@@ -121,7 +117,6 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException("Invalid or expired refresh token");
     }
-    console.log("We are trying to refresh the token for the user", payload);
 
     if (payload.tokenType !== "refresh") {
       throw new UnauthorizedException("Invalid refresh token");
@@ -274,7 +269,7 @@ export class AuthService {
     };
   }
   private getRefreshSecret(): string {
-    return process.env.JWT_REFRESH_SECRET || "fallback_secret";
+    return getRequiredEnv("JWT_REFRESH_SECRET");
   }
 
   async me(userId: string, tenantId: string) {

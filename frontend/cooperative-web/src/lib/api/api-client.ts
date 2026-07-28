@@ -8,6 +8,8 @@ import {
   setRefreshToken,
   setStoredUser,
 } from "@/lib/auth/auth-storage";
+import { mapAuthenticatedUser } from "@/features/auth/api/auth.mapper";
+import type { AuthenticatedUserResponse } from "@/features/auth/types/auth.types";
 
 /**
  * Central Axios instance for the whole app.
@@ -24,14 +26,13 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 interface RefreshResponse {
   accessToken: string;
   refreshToken?: string;
-  user: {
-    id: string;
-    fullName: string;
-    email: string;
-    tenantId?: string;
-    tenantName?: string;
-    permissions: string[];
-  }
+  // Same shape the login endpoint returns — previously this was a
+  // different, incorrect shape (a single `fullName` field that the real
+  // backend never actually sends), which meant every silent token refresh
+  // stored a user object missing roles/mustChangePassword. Reusing
+  // AuthenticatedUserResponse + mapAuthenticatedUser keeps this in sync
+  // with the login flow instead of drifting independently.
+  user: AuthenticatedUserResponse;
 }
 
 export const apiClient = axios.create({
@@ -45,8 +46,6 @@ apiClient.interceptors.request.use(
   (config) => {
   const token = getAccessToken();
   const tenantId = getStoredTenantId();
-  console.log("We are using this tenantID", tenantId);
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -62,17 +61,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
-
-    console.log("Are we failing here?", originalRequest);
-
     if (!originalRequest) {
       return Promise.reject(error);
     }
 
     const isUnauthorized = error.response?.status === 401;
     const isRefreshRequest = originalRequest.url?.includes("/auth/refresh");
-
-    console.log("Are we failing here?", isUnauthorized, isRefreshRequest);
     if (!isUnauthorized || originalRequest._retry || isRefreshRequest) {
       return Promise.reject(error);
     }
@@ -87,7 +81,6 @@ apiClient.interceptors.response.use(
     }
     
     try {
-      console.log("Starting Refresh Call...");
       const refreshResponse = await axios.post<RefreshResponse>(
         `${import.meta.env.VITE_API_BASE_URL}/auth/refresh`,
         { refreshToken },
@@ -100,14 +93,12 @@ apiClient.interceptors.response.use(
           },
         },
       );
-      console.log("Refresh Call Success!");
-
       const newAccessToken = refreshResponse.data.accessToken;
       const newRefreshToken = refreshResponse.data.refreshToken;
-      const responseUser = refreshResponse.data.user;
+      const mappedUser = mapAuthenticatedUser(refreshResponse.data.user);
 
       setAccessToken(newAccessToken);
-      setStoredUser(responseUser);
+      setStoredUser(mappedUser);
 
       if (newRefreshToken) {
         setRefreshToken(newRefreshToken);

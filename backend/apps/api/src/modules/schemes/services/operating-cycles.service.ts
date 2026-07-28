@@ -462,6 +462,6 @@ export class OperatingCyclesService {
       );
     }
 
-    assertPositiveMoneyString(targetAmount, "targetAmount");
+    assertPositiveMoneyString(targetAmount, "targetAmount", { allowEmpty: true });
   }
 }

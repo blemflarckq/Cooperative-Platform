@@ -19,7 +19,7 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   migrationsRun: true,
-  synchronize: true, // ✅ always false for serious apps'
+  synchronize: false,
   logging: false,
 
   // Load entities automatically (works before entities exist)

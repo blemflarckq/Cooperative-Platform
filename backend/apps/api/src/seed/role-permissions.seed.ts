@@ -74,6 +74,17 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     "scheme:activate",
     "scheme:suspend",
     "scheme:archive",
+    "scheme:role.read",
+    "scheme:role.assign",
+
+    //Approval Policy
+    "approval-policy:manage",
+    "approval-policy:read",
+
+    //Outbound Request
+    "outbound-request:read",
+    "outbound-request:initiate",
+    "outbound-request:approve",
 
     //Cycles
     "cycle:create",
@@ -139,12 +150,18 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
 
     // Loans
     'loan:create',
+    'loan:request',
+    'loan:pledge',
     'loan:read',
     'loan:read.all',
     'loan:issue',
     'loan:approve',
     'loan:reject',
     'loan:repay',
+
+    //LOAN POLICY
+    'loan-policy:read',
+    'loan-policy:manage',
 
     // Funding
     'funding_request:create',
@@ -192,6 +209,24 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'subscription:record-payment',
     'subscription:reverse',
 
+    //Scheme
+    "scheme:create",
+    "scheme:read",
+    "scheme:update",
+    "scheme:activate",
+    "scheme:suspend",
+    "scheme:archive",
+    "scheme:role.read",
+
+    //Approval Policy
+    "approval-policy:manage",
+    "approval-policy:read",
+
+    //Outbound Request
+    "outbound-request:read",
+    "outbound-request:initiate",
+    "outbound-request:approve",
+
     'special_contribution:create',
     'special_contribution:read',
     'special_contribution:read.all',
@@ -220,13 +255,17 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'contribution:read',
     'contribution:reverse',
 
-    'loan:create',
+    'loan:request',
     'loan:read',
-    'loan:read.all',
+    'loan:pledge',
     'loan:issue',
     'loan:approve',
     'loan:reject',
     'loan:repay',
+
+    //LOAN POLICY
+    'loan-policy:read',
+    'loan-policy:manage',
 
     'funding_request:read',
     'funding_request:read.all',
@@ -260,6 +299,25 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'member:read',
     'member:read.all',
     'member:update',
+
+    //Scheme
+    "scheme:create",
+    "scheme:read",
+    "scheme:update",
+    "scheme:activate",
+    "scheme:role.read",
+
+    //LOAN
+    'loan:request',
+    'loan:read',
+    'loan:pledge',
+
+    //LOAN POLICY
+    'loan-policy:read',
+    'loan-policy:manage',
+
+    //Approval Policy
+    "approval-policy:read",
 
     'year_member:add',
     'year_member:read',
@@ -296,8 +354,24 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'subscription:read',
     'special_contribution:read',
 
-    'loan:create',
+    //Scheme
+    "scheme:read",
+    "scheme:role.read",
+
+    //Approval Policy
+    "approval-policy:read",
+
+    //Outbound Request
+    "outbound-request:read",
+
+    //LOAN
+    'loan:request',
     'loan:read',
+    'loan:pledge',
+
+    //LOAN POLICY
+    'loan-policy:read',
+    'loan-policy:manage',
 
     'funding_request:create',
     'funding_request:read',

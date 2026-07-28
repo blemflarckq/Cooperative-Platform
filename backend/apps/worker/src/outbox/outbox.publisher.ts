@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { RabbitMQProvider } from "../messaging/rabbitmq.provider";
-import { OutboxEvent } from "../../../api/src/common/messaging/outbox-event.entity";
-
+//import { OutboxEvent } from "../../../api/src/common/messaging/outbox-event.entity";
+import { OutboxEvent } from "./outbox-event.entity";
 /**
  * Publisher uses a DB transaction to "claim" events and publish them.
  * For production: use SKIP LOCKED and a dedicated claimedAt/claimedBy.
