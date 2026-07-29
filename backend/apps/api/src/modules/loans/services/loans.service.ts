@@ -3,13 +3,14 @@ import { DataSource, EntityManager } from "typeorm";
 import { Loan } from "../entities/loan.entity";
 import { LoanPolicy } from "../entities/loan-policy.entity";
 import { LoanPledge } from "../entities/loan-pledge.entity";
-import { OperatingCycle } from "../../schemes/entities/operating-cycle.entity";
+import { CooperativeScheme } from "../../schemes/entities/cooperative-scheme.entity";
 import { LoanStatus } from "../enums/loan.enums";
 import { OutboundRequestType } from "../../schemes/enums/governance.enums";
 import { splitLoanIntoTranches } from "./loan-tranche-split";
 import { MemberBalanceService } from "./member-balance.service";
 import { ActorTenantUserResolverService } from "../../schemes/services/actor-tenant-user-resolver.service";
 import { OutboundRequestsService } from "../../schemes/services/outbound-requests.service";
+import { OperatingCyclesService } from "../../schemes/services/operating-cycles.service";
 
 export interface RequestLoanInput {
   amount: string;
@@ -23,6 +24,7 @@ export class LoansService {
     private readonly actorResolver: ActorTenantUserResolverService,
     private readonly memberBalanceService: MemberBalanceService,
     private readonly outboundRequestsService: OutboundRequestsService,
+    private readonly operatingCyclesService: OperatingCyclesService,
   ) {}
 
   async findOne(tenantId: string, loanId: string): Promise<Loan> {
@@ -46,28 +48,21 @@ export class LoansService {
     });
   }
 
-  async findAllForCycle(tenantId: string, cycleId: string): Promise<Loan[]> {
-    return this.dataSource.getRepository(Loan).find({
-      where: { tenantId, cycleId },
-      relations: { pledges: true },
-      order: { createdAt: "DESC" },
-    });
-  }
-
   /**
-   * Requests a new loan for the acting user (the borrower requests their
-   * own loan — this is not an admin-on-behalf-of-someone-else flow). The
-   * request automatically splits into self-funded and peer-funded
-   * tranches; if there's no peer-funded excess at all, the loan skips
-   * straight to PENDING_APPROVAL and an OutboundRequest is created
-   * immediately — the "auto-approved" self-funded tranche only means the
-   * credit decision is automatic, real money still requires the standard
-   * 2-approver sign-off before it can leave the account, same as any
-   * other withdrawal.
+   * Requests a new loan for the acting user, scoped to a SCHEME only —
+   * not a cycle. The member never needs to know or select a cycle; the
+   * current one is resolved internally via OperatingCyclesService, which
+   * for project-based schemes returns the single implicit cycle created
+   * automatically when the scheme activated, and for recurring schemes
+   * returns whichever cycle the Treasurer currently has open. This is the
+   * actual fix for "cycles feel clunky" — the concept still exists in the
+   * data model (it has to, since contributions/balances are tracked per
+   * cycle), it's just no longer something any API caller outside this
+   * service needs to resolve themselves.
    */
   async requestLoan(
     tenantId: string,
-    cycleId: string,
+    schemeId: string,
     input: RequestLoanInput,
     actorUserId: string,
   ): Promise<Loan> {
@@ -82,14 +77,18 @@ export class LoansService {
     return this.dataSource.transaction(async (manager) => {
       const borrower = await this.actorResolver.resolve(manager, tenantId, actorUserId);
 
-      const cycle = await manager.findOne(OperatingCycle, {
-        where: { id: cycleId, tenantId },
+      const scheme = await manager.findOne(CooperativeScheme, {
+        where: { id: schemeId, tenantId },
       });
-      if (!cycle) {
-        throw new NotFoundException("Operating cycle not found.");
+      if (!scheme) {
+        throw new NotFoundException("Scheme not found.");
       }
 
-      const schemeId = cycle.schemeId;
+      const cycle = await this.operatingCyclesService.resolveCurrentCycle(
+        manager,
+        tenantId,
+        schemeId,
+      );
 
       const policy = await manager.findOne(LoanPolicy, {
         where: { tenantId, schemeId },
@@ -118,7 +117,7 @@ export class LoansService {
         await this.memberBalanceService.getAvailableSelfFundingCapacity(
           manager,
           tenantId,
-          cycleId,
+          cycle.id,
           borrower.id,
         );
 
@@ -133,7 +132,7 @@ export class LoansService {
       const loan = manager.create(Loan, {
         tenantId,
         schemeId,
-        cycleId,
+        cycleId: cycle.id,
         borrowerTenantUserId: borrower.id,
         principalAmount: requestedAmount.toFixed(2),
         selfFundedPrincipal: selfFundedPrincipal.toFixed(2),
@@ -160,13 +159,6 @@ export class LoansService {
     });
   }
 
-  /**
-   * Records one member's pledge toward funding another member's
-   * peer-funded excess. Once pledges reach the full peer-funded amount,
-   * the loan automatically moves to PENDING_APPROVAL and an
-   * OutboundRequest is created — pledging is a funding-source decision,
-   * not a substitute for the treasury's 2-approver control.
-   */
   async pledge(
     tenantId: string,
     loanId: string,

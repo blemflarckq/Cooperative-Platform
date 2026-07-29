@@ -11,6 +11,7 @@ export class CreateSchemeDto {
   @MaxLength(160)
   name!: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(80)
   code?: string;

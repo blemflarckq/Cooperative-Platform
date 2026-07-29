@@ -13,6 +13,7 @@ import { CreateSchemeDto } from "../dto/schemes/create-scheme.dto";
 import { UpdateSchemeDto } from "../dto/schemes/update-scheme.dto";
 import { SchemeStatus } from "../enums/scheme.enums";
 import { SchemesOutboxService } from "./schemes-outbox.service";
+import { OperatingCyclesService } from "./operating-cycles.service";
 import { slugifyCode } from "../../../common/utils/code-generator";
 
 @Injectable()
@@ -24,6 +25,7 @@ export class SchemesService {
     private readonly schemesRepo: Repository<CooperativeScheme>,
 
     private readonly schemesOutboxService: SchemesOutboxService,
+    private readonly operatingCyclesService: OperatingCyclesService,
   ) {}
 
   async create(
@@ -301,6 +303,15 @@ export class SchemesService {
       }
 
       const saved = await manager.save(CooperativeScheme, scheme);
+
+      if (nextStatus === SchemeStatus.ACTIVE) {
+        await this.operatingCyclesService.ensureImplicitCycleForProjectScheme(
+          manager,
+          tenantId,
+          saved,
+          actorUserId,
+        );
+      }
 
       await this.schemesOutboxService.publish({
         manager,

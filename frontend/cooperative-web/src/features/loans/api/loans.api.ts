@@ -20,21 +20,23 @@ export async function getLoansForScheme(schemeId: string): Promise<Loan[]> {
   return response.data;
 }
 
-export async function getLoansForCycle(cycleId: string): Promise<Loan[]> {
-  const response = await apiClient.get<Loan[]>(`/cycles/${cycleId}/loans`);
-  return response.data;
-}
-
 export async function getLoan(loanId: string): Promise<Loan> {
   const response = await apiClient.get<Loan>(`/loans/${loanId}`);
   return response.data;
 }
 
+/**
+ * Scoped to a scheme only — never a cycle. The backend resolves "the
+ * current cycle" internally now (see OperatingCyclesService.
+ * resolveCurrentCycle on the backend), which is the whole point: a member
+ * requesting a loan should never need to know what a "cycle" is, let
+ * alone select one.
+ */
 export async function requestLoan(
-  cycleId: string,
+  schemeId: string,
   payload: RequestLoanRequest,
 ): Promise<Loan> {
-  const response = await apiClient.post<Loan>(`/cycles/${cycleId}/loans`, payload);
+  const response = await apiClient.post<Loan>(`/schemes/${schemeId}/loans`, payload);
   return response.data;
 }
 

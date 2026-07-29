@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ILike } from "typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
 import { CooperativeScheme } from "../entities/cooperative-scheme.entity";
 import { OperatingCycle } from "../entities/operating-cycle.entity";
 import { CreateOperatingCycleDto } from "../dto/operating-cycles/create-operating-cycle.dto";
@@ -128,6 +128,101 @@ export class OperatingCyclesService {
         relations: { scheme: true },
       });
     });
+  }
+
+  /**
+   * For project-based schemes (a one-off fundraiser, not a recurring
+   * savings rotation), the member/Treasurer should never have to think
+   * about "cycles" as a separate concept — a project has exactly one
+   * implicit cycle, created and opened automatically the moment the
+   * scheme itself becomes active. Idempotent: safe to call more than
+   * once, only ever creates one cycle per scheme.
+   *
+   * Deliberately bypasses the normal DRAFT -> OPEN two-step and the
+   * "scheme must already be ACTIVE" guard that createForScheme enforces
+   * — this runs as part of the scheme's own activation transaction, not
+   * as a separate manual action, so those guards don't apply the same
+   * way here.
+   */
+  async ensureImplicitCycleForProjectScheme(
+    manager: EntityManager,
+    tenantId: string,
+    scheme: CooperativeScheme,
+    actorUserId?: string,
+  ): Promise<OperatingCycle | null> {
+    if (scheme.cycleMode !== CycleMode.PROJECT_BASED) {
+      return null;
+    }
+
+    const existing = await manager.findOne(OperatingCycle, {
+      where: { tenantId, schemeId: scheme.id },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const now = new Date();
+    let cycle = manager.create(OperatingCycle, {
+      tenantId,
+      schemeId: scheme.id,
+      name: scheme.name,
+      code: slugifyCode(scheme.name),
+      description: null,
+      status: OperatingCycleStatus.OPEN,
+      startsOn: null,
+      endsOn: null,
+      targetAmount: null,
+      openedAt: now,
+      closedAt: null,
+    });
+
+    cycle = await manager.save(OperatingCycle, cycle);
+
+    await this.schemesOutboxService.publish({
+      manager,
+      tenantId,
+      aggregateId: cycle.id,
+      aggregateType: "operating_cycle",
+      eventType: "cycle.created.v1",
+      actorUserId,
+      payload: {
+        cycleId: cycle.id,
+        schemeId: cycle.schemeId,
+        name: cycle.name,
+        code: cycle.code,
+        status: cycle.status,
+        implicit: true,
+      },
+    });
+
+    return cycle;
+  }
+
+  /**
+   * Resolves "the cycle this scheme's activity currently belongs to" —
+   * the mechanism that lets member-facing flows (like requesting a loan)
+   * work off a schemeId alone, never asking a member to know or select a
+   * cycle. For project-based schemes this is the single implicit cycle;
+   * for recurring schemes it's the most recently opened OPEN cycle.
+   */
+  async resolveCurrentCycle(
+    manager: EntityManager,
+    tenantId: string,
+    schemeId: string,
+  ): Promise<OperatingCycle> {
+    const cycle = await manager.findOne(OperatingCycle, {
+      where: { tenantId, schemeId, status: OperatingCycleStatus.OPEN },
+      order: { openedAt: "DESC" },
+    });
+
+    if (!cycle) {
+      throw new BadRequestException(
+        "This scheme has no open cycle right now — ask your Treasurer to open one before continuing.",
+      );
+    }
+
+    return cycle;
   }
 
   async findByScheme(
@@ -462,6 +557,6 @@ export class OperatingCyclesService {
       );
     }
 
-    assertPositiveMoneyString(targetAmount, "targetAmount", { allowEmpty: true });
+    assertPositiveMoneyString(targetAmount, "targetAmount");
   }
 }

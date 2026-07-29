@@ -10,6 +10,12 @@ import { RequestLoanDto } from "../dto/request-loan.dto";
 import { PledgeLoanDto } from "../dto/pledge-loan.dto";
 import { RecordRepaymentDto } from "../dto/record-repayment.dto";
 
+/**
+ * Every route here is scheme-scoped, not cycle-scoped — a member or
+ * Treasurer never needs to know or supply a cycleId. LoansService
+ * resolves "the current cycle" internally via
+ * OperatingCyclesService.resolveCurrentCycle().
+ */
 @Controller()
 export class LoansController {
   constructor(
@@ -28,15 +34,6 @@ export class LoansController {
     return this.loansService.findAllForScheme(tenantId, schemeId);
   }
 
-  @Get("cycles/:cycleId/loans")
-  @RequirePermissions("loan:read")
-  async findAllForCycle(
-    @TenantId() tenantId: string,
-    @Param("cycleId") cycleId: string,
-  ) {
-    return this.loansService.findAllForCycle(tenantId, cycleId);
-  }
-
   @Get("loans/:loanId")
   @RequirePermissions("loan:read")
   async findOne(
@@ -46,15 +43,15 @@ export class LoansController {
     return this.loansService.findOne(tenantId, loanId);
   }
 
-  @Post("cycles/:cycleId/loans")
+  @Post("schemes/:schemeId/loans")
   @RequirePermissions("loan:request")
   async requestLoan(
     @TenantId() tenantId: string,
     @CurrentUser() actorUserId: string,
-    @Param("cycleId") cycleId: string,
+    @Param("schemeId") schemeId: string,
     @Body() dto: RequestLoanDto,
   ) {
-    return this.loansService.requestLoan(tenantId, cycleId, dto, actorUserId);
+    return this.loansService.requestLoan(tenantId, schemeId, dto, actorUserId);
   }
 
   @Post("loans/:loanId/pledges")
@@ -94,13 +91,6 @@ export class LoansController {
     );
   }
 
-  /**
-   * Manually triggers one month's rate escalation for a single loan.
-   * Temporary — this will be replaced by an automatic scheduled job (see
-   * LoanRateEscalationService) once that's built. Exposed as an endpoint
-   * for now so the mechanism can actually be tested and used before that
-   * infrastructure exists.
-   */
   @Post("loans/:loanId/escalate-rate")
   @RequirePermissions("loan:escalate-rate")
   async escalateRate(
