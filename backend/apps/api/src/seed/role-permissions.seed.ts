@@ -11,7 +11,7 @@ import { RolePermission } from '../modules/identity/entities/role-permission.ent
  *
  * Example:
  *   year:read
- *   loan:issue
+ *   loan:request
  *   funding_request:fulfill
  */
 const ROLE_PERMISSION_MAP: Record<string, string[]> = {
@@ -74,17 +74,6 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     "scheme:activate",
     "scheme:suspend",
     "scheme:archive",
-    "scheme:role.read",
-    "scheme:role.assign",
-
-    //Approval Policy
-    "approval-policy:manage",
-    "approval-policy:read",
-
-    //Outbound Request
-    "outbound-request:read",
-    "outbound-request:initiate",
-    "outbound-request:approve",
 
     //Cycles
     "cycle:create",
@@ -96,13 +85,30 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     "cycle:cancel",
 
     //Cycle Participants
-    "cycle_participant:add",
+    "cycle_participant:create",
     "cycle_participant:read",
     "cycle_participant:update",
     "cycle_participant:suspend",
     "cycle_participant:reactivate",
     "cycle_participant:exit",
     "cycle_participant:remove",
+
+    // Scheme governance roles
+    'scheme-role:read',
+    'scheme-role:assign',
+
+    // Approval policy
+    'approval-policy:read',
+    'approval-policy:manage',
+
+    // Outbound requests (the 2-approver withdrawal engine)
+    'outbound-request:read',
+    'outbound-request:initiate',
+    'outbound-request:approve',
+
+    // Loan policy
+    'loan-policy:read',
+    'loan-policy:manage',
 
     // Contributions
     'subscription:create',
@@ -149,44 +155,19 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'contribution:reverse',
 
     // Loans
-    'loan:create',
     'loan:request',
-    'loan:pledge',
     'loan:read',
-    'loan:read.all',
-    'loan:issue',
-    'loan:approve',
-    'loan:reject',
-    'loan:repay',
-
-    //LOAN POLICY
-    'loan-policy:read',
-    'loan-policy:manage',
-
-    // Funding
-    'funding_request:create',
-    'funding_request:read',
-    'funding_request:read.all',
-    'funding_request:fulfill',
-
-    'funding_commitment:create',
-    'funding_commitment:read',
-    'funding_commitment:read.all',
-
-    // Payouts
-    'payout:read',
-    'payout:read.all',
-    'payout:calculate',
-    'payout:execute',
+    'loan:pledge',
+    'loan:disburse',
+    'loan:record-repayment',
+    'loan:escalate-rate',
 
     // Reports
-    'report:read',
-    'report:export',
     "savings_statement:read",
     "savings_summary:read",
     "report:trial_balance:read",
     "report:account_ledger:read",
-    "report:accounting_summary:read"
+    "report:accounting_summary:read",
   ],
 
   treasurer: [
@@ -208,24 +189,6 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'subscription:read.all',
     'subscription:record-payment',
     'subscription:reverse',
-
-    //Scheme
-    "scheme:create",
-    "scheme:read",
-    "scheme:update",
-    "scheme:activate",
-    "scheme:suspend",
-    "scheme:archive",
-    "scheme:role.read",
-
-    //Approval Policy
-    "approval-policy:manage",
-    "approval-policy:read",
-
-    //Outbound Request
-    "outbound-request:read",
-    "outbound-request:initiate",
-    "outbound-request:approve",
 
     'special_contribution:create',
     'special_contribution:read',
@@ -255,32 +218,22 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'contribution:read',
     'contribution:reverse',
 
+    // Loans
     'loan:request',
     'loan:read',
     'loan:pledge',
-    'loan:issue',
-    'loan:approve',
-    'loan:reject',
-    'loan:repay',
+    'loan:disburse',
+    'loan:record-repayment',
+    'loan:escalate-rate',
 
-    //LOAN POLICY
+    // Scheme governance — treasurer is a natural approver
+    'scheme-role:read',
+    'outbound-request:read',
+    'outbound-request:initiate',
+    'outbound-request:approve',
     'loan-policy:read',
-    'loan-policy:manage',
+    'approval-policy:read',
 
-    'funding_request:read',
-    'funding_request:read.all',
-    'funding_request:fulfill',
-
-    'funding_commitment:read',
-    'funding_commitment:read.all',
-
-    'payout:read',
-    'payout:read.all',
-    'payout:calculate',
-    'payout:execute',
-
-    'report:read',
-    'report:export',
     "report:trial_balance:read",
     "report:account_ledger:read",
 
@@ -300,25 +253,6 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'member:read.all',
     'member:update',
 
-    //Scheme
-    "scheme:create",
-    "scheme:read",
-    "scheme:update",
-    "scheme:activate",
-    "scheme:role.read",
-
-    //LOAN
-    'loan:request',
-    'loan:read',
-    'loan:pledge',
-
-    //LOAN POLICY
-    'loan-policy:read',
-    'loan-policy:manage',
-
-    //Approval Policy
-    "approval-policy:read",
-
     'year_member:add',
     'year_member:read',
     'year_member:read.all',
@@ -328,7 +262,11 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'journal_entry:read',
 
     'accounting_settings:read',
-    
+
+    // Scheme governance — read visibility only
+    'scheme-role:read',
+    'outbound-request:read',
+
     // Contribution
     'contribution:create',
     'contribution:read',
@@ -354,33 +292,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'subscription:read',
     'special_contribution:read',
 
-    //Scheme
-    "scheme:read",
-    "scheme:role.read",
-
-    //Approval Policy
-    "approval-policy:read",
-
-    //Outbound Request
-    "outbound-request:read",
-
-    //LOAN
     'loan:request',
     'loan:read',
     'loan:pledge',
-
-    //LOAN POLICY
-    'loan-policy:read',
-    'loan-policy:manage',
-
-    'funding_request:create',
-    'funding_request:read',
-
-    'funding_commitment:create',
-    'funding_commitment:read',
-
-    'payout:read',
-    'report:read',
+    'outbound-request:read',
   ],
 };
 

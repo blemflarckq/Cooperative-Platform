@@ -124,8 +124,6 @@ const PERMISSIONS: Array<{
       { action: "activate", description: "activate tenant scheme" },
       { action: "suspend", description: "suspend tenant scheme" },
       { action: "archive", description: "archive tenant scheme" },
-      { action: "role.read", description: "archive tenant scheme" },
-      { action: "role.assign", description: "archive tenant scheme" },
     ],
   },
 
@@ -151,13 +149,58 @@ const PERMISSIONS: Array<{
   {
     resource: "cycle_participant",
     actions: [
-      { action: "add", description: "add cycle Participant" },
+      { action: "create", description: "add cycle Participant" },
       { action: "read", description: "view cycle participants" },
       { action: "update", description: "Update scheme cyle participant" },
       { action: "suspend", description: "suspend cycle participant" },
       { action: "reactivate", description: "reactivate cycle participant" },
       { action: "exit", description: "exit current cycle" },
       { action: "remove", description: "remove current participant from cycle" },
+    ],
+  },
+
+  // =========================
+  // SCHEME GOVERNANCE ROLES
+  // =========================
+  {
+    resource: "scheme-role",
+    actions: [
+      { action: "read", description: "View a scheme's governance role assignments" },
+      { action: "assign", description: "Assign, hand over, or end a scheme governance role" },
+    ],
+  },
+
+  // =========================
+  // APPROVAL POLICY
+  // =========================
+  {
+    resource: "approval-policy",
+    actions: [
+      { action: "read", description: "View a scheme's approval policy" },
+      { action: "manage", description: "Configure a scheme's approval policy" },
+    ],
+  },
+
+  // =========================
+  // OUTBOUND REQUESTS (the 2-approver withdrawal engine)
+  // =========================
+  {
+    resource: "outbound-request",
+    actions: [
+      { action: "read", description: "View outbound requests for a scheme" },
+      { action: "initiate", description: "Initiate an outbound request" },
+      { action: "approve", description: "Record an approval or rejection decision" },
+    ],
+  },
+
+  // =========================
+  // LOAN POLICY
+  // =========================
+  {
+    resource: "loan-policy",
+    actions: [
+      { action: "read", description: "View a scheme's loan interest policy" },
+      { action: "manage", description: "Configure a scheme's loan interest policy" },
     ],
   },
 
@@ -322,52 +365,14 @@ const PERMISSIONS: Array<{
   {
     resource: "loan",
     actions: [
-      { action: "create", description: "Create loan request" },
-      { action: "request", description: "Create loan request" },
-      { action: "pledge", description: "Create loan request" },
-      { action: "read", description: "View own loans" },
-      { action: "read.all", description: "View all loans" },
-      { action: "issue", description: "Issue loan" },
-      { action: "approve", description: "Approve loan" },
-      { action: "reject", description: "Reject loan" },
-      { action: "repay", description: "Record loan repayment" },
+      { action: "request", description: "Request a loan" },
+      { action: "read", description: "View loans" },
+      { action: "pledge", description: "Pledge toward another member's peer-funded loan excess" },
+      { action: "disburse", description: "Disburse a fully-approved loan" },
+      { action: "record-repayment", description: "Record a loan repayment" },
+      { action: "escalate-rate", description: "Escalate a loan's peer-funded interest rate" },
     ],
   },
-
-  // =========================
-  // LOAN POLICY
-  // =========================
-  {
-    resource: "laon-policy",
-    actions: [
-      { action: "manage", description: "Manage loan policy" },
-      { action: "read", description: "View loan policy" },
-    ],
-  },
-
-  // =========================
-  // APPROVAL POLICY
-  // =========================
-  {
-    resource: "approval-policy",
-    actions: [
-      { action: "manage", description: "Manage approval policy" },
-      { action: "read", description: "View approval policy" },
-    ],
-  },
-
-  // =========================
-  // OUTBOUND REQUEST
-  // =========================
-  {
-    resource: "outbound-request",
-    actions: [
-      { action: "read", description: "View outbount requests" },
-      { action: "initiate", description: "Trigger an outbound funds reqeuest" },
-      { action: "approve", description: "Approve an outbound funds reqeuest" },
-    ],
-  },
-
 
   // =========================
   // FUNDING REQUESTS
