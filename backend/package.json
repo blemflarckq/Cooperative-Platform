@@ -24,7 +24,7 @@
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "infra:logs": "docker compose -f infra/docker-compose.yml logs -f",
     "infra:up:tools": "docker compose --env-file infra/.env -f infra/docker-compose.yml --profile tools up -d",
-    "db:cli": "dotenv -e infra/.env.local -- typeorm-ts-node-commonjs -d apps/api/src/config/typeorm.datasource.ts",
+    "db:cli": "dotenv -e infra/.env -- typeorm-ts-node-commonjs -d apps/api/src/config/typeorm.datasource.ts",
     "db:show": "npm run db:cli -- migration:show",
     "db:run": "npm run db:cli -- migration:run",
     "db:revert": "npm run db:cli -- migration:revert",

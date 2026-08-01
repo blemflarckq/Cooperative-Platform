@@ -147,6 +147,11 @@ export class LoansService {
           "This scheme has no loan policy configured yet — set one up before requesting a loan.",
         );
       }
+      if (!policy.isReviewed) {
+        throw new BadRequestException(
+          "This scheme's loan policy is still a draft — a Treasurer needs to review and confirm the interest terms before loans can be requested.",
+        );
+      }
 
       const existingActiveLoan = await manager.findOne(Loan, {
         where: {

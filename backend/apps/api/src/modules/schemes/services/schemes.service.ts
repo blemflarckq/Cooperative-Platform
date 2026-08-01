@@ -11,9 +11,10 @@ import { DataSource, Repository } from "typeorm";
 import { CooperativeScheme } from "../entities/cooperative-scheme.entity";
 import { CreateSchemeDto } from "../dto/schemes/create-scheme.dto";
 import { UpdateSchemeDto } from "../dto/schemes/update-scheme.dto";
-import { SchemeStatus } from "../enums/scheme.enums";
+import { SchemeStatus, LoanMode } from "../enums/scheme.enums";
 import { SchemesOutboxService } from "./schemes-outbox.service";
 import { OperatingCyclesService } from "./operating-cycles.service";
+import { ensureDraftLoanPolicyForScheme } from "../../loans/services/loan-policy.service";
 import { slugifyCode } from "../../../common/utils/code-generator";
 
 @Injectable()
@@ -311,6 +312,10 @@ export class SchemesService {
           saved,
           actorUserId,
         );
+
+        if (saved.loanMode !== LoanMode.DISABLED) {
+          await ensureDraftLoanPolicyForScheme(manager, tenantId, saved.id);
+        }
       }
 
       await this.schemesOutboxService.publish({
