@@ -47,6 +47,7 @@ export class AccountingSettingsService {
         loanReceivableAccountId: settings.loanReceivableAccountId,
         interestIncomeAccountId: settings.interestIncomeAccountId,
         penaltyIncomeAccountId: settings.penaltyIncomeAccountId,
+        strictPeriodEnforcement: settings.strictPeriodEnforcement,
       };
 
       await this.validateConfiguredAccounts(manager, tenantId, dto);
@@ -72,6 +73,10 @@ export class AccountingSettingsService {
         settings.penaltyIncomeAccountId = dto.penaltyIncomeAccountId;
       }
 
+      if (dto.strictPeriodEnforcement !== undefined) {
+        settings.strictPeriodEnforcement = dto.strictPeriodEnforcement;
+      }
+
       const saved = await manager.save(AccountingSettings, settings);
 
       await this.accountingOutboxService.publish({
@@ -91,6 +96,7 @@ export class AccountingSettingsService {
             loanReceivableAccountId: saved.loanReceivableAccountId,
             interestIncomeAccountId: saved.interestIncomeAccountId,
             penaltyIncomeAccountId: saved.penaltyIncomeAccountId,
+            strictPeriodEnforcement: saved.strictPeriodEnforcement,
           },
         },
       });

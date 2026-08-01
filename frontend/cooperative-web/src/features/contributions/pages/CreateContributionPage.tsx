@@ -43,7 +43,7 @@ export function CreateContributionPage() {
   const cycleQuery = useCycle(cycleId!);
   const participantsQuery = useCycleParticipants(cycleId!, {
     page: 1,
-    limit: 200,
+    limit: 100,
     status: "ACTIVE",
   });
 

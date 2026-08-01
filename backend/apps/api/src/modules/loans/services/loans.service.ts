@@ -60,6 +60,55 @@ export class LoansService {
    * cycle), it's just no longer something any API caller outside this
    * service needs to resolve themselves.
    */
+  /**
+   * Computes what a loan request WOULD look like — the tranche split —
+   * without actually creating anything. This is what powers the live
+   * "here's how this breaks down" preview a member sees while typing an
+   * amount, before they submit. Deliberately read-only and side-effect
+   * free, and just as importantly: still scheme-scoped only, resolving
+   * the cycle internally exactly like requestLoan() does, so the preview
+   * never leaks "cycle" as a concept either.
+   */
+  async previewSplit(
+    tenantId: string,
+    schemeId: string,
+    amount: string,
+    actorUserId: string,
+  ): Promise<{ selfFundedPrincipal: string; peerFundedPrincipal: string }> {
+    const requestedAmount = Number(amount);
+    if (!(requestedAmount > 0)) {
+      throw new BadRequestException("amount must be greater than zero.");
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const borrower = await this.actorResolver.resolve(manager, tenantId, actorUserId);
+
+      const cycle = await this.operatingCyclesService.resolveCurrentCycle(
+        manager,
+        tenantId,
+        schemeId,
+      );
+
+      const availableSelfFunding =
+        await this.memberBalanceService.getAvailableSelfFundingCapacity(
+          manager,
+          tenantId,
+          cycle.id,
+          borrower.id,
+        );
+
+      const { selfFundedPrincipal, peerFundedPrincipal } = splitLoanIntoTranches({
+        requestedAmount,
+        borrowerContributionBalance: availableSelfFunding,
+      });
+
+      return {
+        selfFundedPrincipal: selfFundedPrincipal.toFixed(2),
+        peerFundedPrincipal: peerFundedPrincipal.toFixed(2),
+      };
+    });
+  }
+
   async requestLoan(
     tenantId: string,
     schemeId: string,

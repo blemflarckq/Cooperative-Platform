@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api/api-client";
 import type {
   Loan,
+  LoanSplitPreview,
   RequestLoanRequest,
   PledgeLoanRequest,
   RecordRepaymentRequest,
@@ -22,6 +23,17 @@ export async function getLoansForScheme(schemeId: string): Promise<Loan[]> {
 
 export async function getLoan(loanId: string): Promise<Loan> {
   const response = await apiClient.get<Loan>(`/loans/${loanId}`);
+  return response.data;
+}
+
+export async function previewLoanSplit(
+  schemeId: string,
+  amount: string,
+): Promise<LoanSplitPreview> {
+  const response = await apiClient.get<LoanSplitPreview>(
+    `/schemes/${schemeId}/loans/preview`,
+    { params: { amount } },
+  );
   return response.data;
 }
 

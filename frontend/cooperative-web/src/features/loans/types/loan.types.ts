@@ -59,6 +59,11 @@ export interface Loan {
   };
 }
 
+export interface LoanSplitPreview {
+  selfFundedPrincipal: string;
+  peerFundedPrincipal: string;
+}
+
 export interface RequestLoanRequest {
   amount: string;
   purpose: string;

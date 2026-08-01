@@ -12,6 +12,7 @@ export class AccountingSettingsResponseMapper {
       loanReceivableAccountId: settings.loanReceivableAccountId,
       interestIncomeAccountId: settings.interestIncomeAccountId,
       penaltyIncomeAccountId: settings.penaltyIncomeAccountId,
+      strictPeriodEnforcement: settings.strictPeriodEnforcement,
 
       accounts: {
         cash: settings.cashAccount

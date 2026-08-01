@@ -14,6 +14,7 @@ import { CyclesPage } from "@/features/cycles/pages/CyclesPage";
 import { SubscriptionsPage } from "@/features/subscriptions/pages/SubscriptionsPage";
 import { ContributionsPage } from "@/features/contributions/pages/ContributionsPage";
 import { LoansPage } from "@/features/loans/pages/LoansPage";
+import { RequestLoanPage } from "@/features/loans/pages/RequestLoanPage";
 import { ApprovalsPage } from "@/features/approvals/pages/ApprovalsPage";
 import { PayoutsPage } from "@/features/payouts/pages/PayoutsPage";
 import { AuditPage } from "@/features/audit/pages/AuditPage";
@@ -98,6 +99,8 @@ export function AppRouter() {
               <Route path=":schemeId" element={<SchemeDetailsPage />} />
               <Route path=":schemeId/edit" element={<EditSchemePage />} />
               <Route path=":schemeId/approvals" element={<ApprovalsPage />} />
+              <Route path=":schemeId/loans" element={<LoansPage />} />
+              <Route path=":schemeId/loans/new" element={<RequestLoanPage />} />
               <Route
                 path=":schemeId/cycles/new"
                 element={<CreateCyclePage />}
@@ -148,7 +151,6 @@ export function AppRouter() {
             <Route path="cycles" element={<CyclesPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="contributions" element={<ContributionsPage />} />
-            <Route path="loans" element={<LoansPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="settings" element={<SettingsPage />} />

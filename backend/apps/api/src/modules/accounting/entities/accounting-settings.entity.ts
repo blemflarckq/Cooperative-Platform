@@ -64,4 +64,18 @@ export class AccountingSettings extends BaseEntity {
   @ManyToOne(() => Account, { onDelete: "RESTRICT", nullable: true })
   @JoinColumn({ name: "penaltyIncomeAccountId" })
   penaltyIncomeAccount!: Account | null;
+
+  /**
+   * Whether closed accounting periods actually block posting.
+   *
+   * Defaults to false — closing a period is still fully supported (the
+   * whole AccountingPeriod mechanism stays intact for cooperatives that
+   * need real month-end/year-end closing discipline), but a closed period
+   * won't silently reject a pilot Treasurer's posting unless this tenant
+   * has deliberately opted into strict enforcement. This is the
+   * "expose it for professionals, not by default for a lightweight pilot"
+   * pattern applied to accounting periods specifically.
+   */
+  @Column({ type: "boolean", default: false })
+  strictPeriodEnforcement!: boolean;
 }

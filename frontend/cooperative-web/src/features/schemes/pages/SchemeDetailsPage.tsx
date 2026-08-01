@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardCheck, Pencil, Plus } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, HandCoins, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -177,6 +177,16 @@ export function SchemeDetailsPage() {
               >
                 <ClipboardCheck className="mr-2 size-4" />
                 {isCommunityMode ? "Waiting on you" : "Approvals"}
+              </Button>
+            </PermissionGate>
+
+            <PermissionGate permissions={["loan:read"]}>
+              <Button
+                variant="outline"
+                onClick={() => navigate(appPath(`/schemes/${scheme.id}/loans`))}
+              >
+                <HandCoins className="mr-2 size-4" />
+                Loans
               </Button>
             </PermissionGate>
 

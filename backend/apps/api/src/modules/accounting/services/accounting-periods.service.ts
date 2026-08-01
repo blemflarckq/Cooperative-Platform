@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, DataSource, ILike, Repository } from "typeorm";
 import { AccountingPeriod } from "../entities/accounting-period.entity";
+import { AccountingSettings } from "../entities/accounting-settings.entity";
 import { CreateAccountingPeriodDto } from "../dto/accounting-periods/create-accounting-period.dto";
 import { ListAccountingPeriodsQueryDto } from "../dto/accounting-periods/list-accounting-periods.query.dto";
 import { AccountingPeriodStatus } from "../enums/accounting-period.enums";
@@ -184,6 +185,25 @@ export class AccountingPeriodsService {
     tenantId: string,
     transactionDate: string,
   ): Promise<void> {
+    const settings = await this.periodsRepo.manager.findOne(AccountingSettings, {
+      where: { tenantId },
+    });
+
+    /**
+     * Closed-period enforcement is opt-in (see AccountingSettings.
+     * strictPeriodEnforcement). Accounting periods themselves are fully
+     * functional either way — they can be created and closed regardless
+     * of this setting — but a closed period only actually blocks posting
+     * once a tenant has deliberately turned strict enforcement on. This
+     * is what keeps a pilot Treasurer from being blocked by real
+     * month-end/year-end closing discipline they haven't opted into yet,
+     * while leaving that discipline fully available for cooperatives that
+     * need it.
+     */
+    if (!settings?.strictPeriodEnforcement) {
+      return;
+    }
+
     const period = await this.periodsRepo
       .createQueryBuilder("period")
       .where("period.tenantId = :tenantId", { tenantId })
@@ -195,8 +215,6 @@ export class AccountingPeriodsService {
      * If no accounting period exists for the date, we currently allow posting.
      *
      * This keeps setup flexible for early tenants.
-     * Later, when we introduce strict accounting mode, we can require every
-     * posting date to fall inside an open accounting period.
      */
     if (!period) {
       return;

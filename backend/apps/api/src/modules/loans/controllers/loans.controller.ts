@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { TenantId } from "../../../common/tenancy/tenant-id.decorator";
 import { CurrentUser } from "../../../common/auth/current-user.decorator";
 import { RequirePermissions } from "../../../common/rbac/require-permissions.decorator";
@@ -41,6 +41,17 @@ export class LoansController {
     @Param("loanId") loanId: string,
   ) {
     return this.loansService.findOne(tenantId, loanId);
+  }
+
+  @Get("schemes/:schemeId/loans/preview")
+  @RequirePermissions("loan:request")
+  async previewSplit(
+    @TenantId() tenantId: string,
+    @CurrentUser() actorUserId: string,
+    @Param("schemeId") schemeId: string,
+    @Query("amount") amount: string,
+  ) {
+    return this.loansService.previewSplit(tenantId, schemeId, amount, actorUserId);
   }
 
   @Post("schemes/:schemeId/loans")

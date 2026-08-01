@@ -1,0 +1,16 @@
+1. Start Docker infrastructure (Postgres + RabbitMQ)
+cd backend
+npm run infra:up
+
+2. Start the backend API (Terminal 1)
+cd backend
+npm run start:dev
+
+3. Start the backend Worker (Terminal 2 — separate, leave Terminal 1 running)
+cd backend
+npm run start:worker
+
+4. Start the frontend (Terminal 3)
+cd frontend/cooperative-web
+npm install
+npm run dev

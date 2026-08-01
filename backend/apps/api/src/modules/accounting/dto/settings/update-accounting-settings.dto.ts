@@ -1,4 +1,4 @@
-import { IsOptional, IsUUID } from "class-validator";
+import { IsBoolean, IsOptional, IsUUID } from "class-validator";
 
 export class UpdateAccountingSettingsDto {
   @IsOptional()
@@ -20,4 +20,8 @@ export class UpdateAccountingSettingsDto {
   @IsOptional()
   @IsUUID()
   penaltyIncomeAccountId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  strictPeriodEnforcement?: boolean;
 }
