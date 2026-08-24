@@ -172,8 +172,26 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
 
   treasurer: [
     'system:dashboard.read',
+    'system:settings.read',
+
+    // Users / roles / audit
+    'user:create',
+    'user:read',
+    'user:read.all',
+    'user:update',
+    'user:deactivate',
+    'user:activate',
+    'user:assign-role',
+    'create_temp_password',
+    'invite',
+
+    'role:read',
+    'role:read.all',
+    'role:assign-permission',
 
     'audit:read',
+    'audit:read.all',
+    'audit:export',
 
     'year:read',
     'year:read.all',
@@ -181,9 +199,65 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'member:read',
     'member:read.all',
 
+    // Years
+    'year:create',
+    'year:read',
+    'year:read.all',
+    'year:open',
+    'year:finalize-roster',
+    'year:close',
+
+    // Members / roster
+    'year_member:add',
     'year_member:read',
     'year_member:read.all',
+    'year_member:update',
+    'year_member:remove',
 
+    //Scheme
+    "scheme:create",
+    "scheme:read",
+    "scheme:update",
+    "scheme:activate",
+    "scheme:suspend",
+    "scheme:archive",
+
+    //Cycles
+    "cycle:create",
+    "cycle:read",
+    "cycle:update",
+    "cycle:open",
+    "cycle:pause",
+    "cycle:close",
+    "cycle:cancel",
+
+    //Cycle Participants
+    "cycle_participant:create",
+    "cycle_participant:read",
+    "cycle_participant:update",
+    "cycle_participant:suspend",
+    "cycle_participant:reactivate",
+    "cycle_participant:exit",
+    "cycle_participant:remove",
+
+    // Scheme governance roles
+    'scheme-role:read',
+    'scheme-role:assign',
+
+    // Approval policy
+    'approval-policy:read',
+    'approval-policy:manage',
+
+    // Outbound requests (the 2-approver withdrawal engine)
+    'outbound-request:read',
+    'outbound-request:initiate',
+    'outbound-request:approve',
+
+    // Loan policy
+    'loan-policy:read',
+    'loan-policy:manage',
+
+    // Contributions
     'subscription:create',
     'subscription:read',
     'subscription:read.all',
@@ -196,10 +270,19 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'special_contribution:record-payment',
     'special_contribution:reverse',
 
+    // Ledger
     'ledger:read',
     'ledger:read.all',
     'ledger:export',
 
+    // Account
+    'account:create',
+    'account:read',
+    'account:update',
+    'account:deactivate',
+    'account:archive',
+
+    // Journal Entry
     'journal_entry:read',
     'journal_entry:post_manual',
     "journal_entry:reverse",
@@ -234,8 +317,12 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'loan-policy:read',
     'approval-policy:read',
 
+    // Reports
+    "savings_statement:read",
+    "savings_summary:read",
     "report:trial_balance:read",
     "report:account_ledger:read",
+    "report:accounting_summary:read",
 
     "savings_statement:read",
     "savings_summary:read",
@@ -367,7 +454,7 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'loan:request',
     'loan:read',
     'loan:pledge',
-    
+
     // Reports
     "savings_statement:read",
     "savings_summary:read",
