@@ -32,7 +32,8 @@
     "db:generate": "npm run db:cli -- migration:generate apps/api/src/migrations/migration",
     "build:seed": "nest build --config nest-cli.seed.json",
     "seed": "docker exec -it coop_api node dist/seed/seed.js",
-    "seed:dev": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/seed.ts"
+    "seed:dev": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/seed.ts",
+    "seed:scenarios": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/scenarios/test-scenario.seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

@@ -557,6 +557,13 @@ export class OperatingCyclesService {
       );
     }
 
-    assertPositiveMoneyString(targetAmount, "targetAmount");
+    // Format/positivity is still enforced whenever a target amount IS
+    // provided, for any cycle mode — but it's only REQUIRED for
+    // PROJECT_BASED cycles (checked above). Without allowEmpty here, a
+    // FIXED_PERIOD or OPEN_ENDED cycle with no target (the normal,
+    // correct case) was being rejected too — the exact same class of bug
+    // already fixed for the scheme-level targetAmount check, just missed
+    // at this call site.
+    assertPositiveMoneyString(targetAmount, "targetAmount", { allowEmpty: true });
   }
 }

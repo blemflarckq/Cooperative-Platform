@@ -284,18 +284,96 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   ],
 
   member: [
+    // System
     'system:dashboard.read',
+    'system:settings.read',
 
+    // Users / roles / audit
+    'user:read',
+    'user:read.all',
+
+    'role:read',
+    'role:read.all',
+
+    'audit:read',
+    'audit:read.all',
+    'audit:export',
+
+    // Years
     'year:read',
+    'year:read.all',
+
+    // Members / roster
     'member:read',
+    'member:read.all',
+    'year_member:read',
+    'year_member:read.all',
 
+    //Scheme
+    "scheme:read",
+
+    //Cycles
+    "cycle:read",
+
+    //Cycle Participants
+    "cycle_participant:read",
+    "cycle_participant:exit",
+
+    // Approval policy
+    'approval-policy:read',
+
+    // Outbound requests (the 2-approver withdrawal engine)
+    'outbound-request:read',
+    'outbound-request:initiate',
+
+    // Loan policy
+    'loan-policy:read',
+
+    // Subscriptions
+    'subscription:create',
     'subscription:read',
-    'special_contribution:read',
+    'subscription:read.all',
+    'subscription:record-payment',
+    'subscription:reverse',
 
+    'special_contribution:create',
+    'special_contribution:read',
+    'special_contribution:read.all',
+    'special_contribution:record-payment',
+    'special_contribution:reverse',
+
+    // Ledger
+    'ledger:read',
+    'ledger:read.all',
+    'ledger:export',
+
+    // Account
+    'account:read',
+
+    // Accounting Settings
+    'accounting_settings:read',
+
+     //Accounting Periods
+    'accounting_period:read',
+    
+    // Journal Entry
+    'journal_entry:read',
+
+    // Contribution
+    'contribution:create',
+    'contribution:read',
+
+    // Loans
     'loan:request',
     'loan:read',
     'loan:pledge',
-    'outbound-request:read',
+    
+    // Reports
+    "savings_statement:read",
+    "savings_summary:read",
+    "report:trial_balance:read",
+    "report:account_ledger:read",
+    "report:accounting_summary:read",
   ],
 };
 
