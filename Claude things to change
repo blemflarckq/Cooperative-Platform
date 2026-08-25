@@ -1,0 +1,17 @@
+3rd Party Loan Pledge view:
+    - The "From your own savings" card needs to capture that the view is now from someone different to the one pledging the loan
+    - The "From your group" card as well needs to communicate better the person viewing this loan.
+        - the view should also be updated for the second and third pledgers and so on as pledges come in to reflect the pledges so far
+    - The "Help fund this" card should also have for constraints to the amounts one can enter given what has already been pledged.
+    - for a person that has pledged they should be able to come back and increase their pledge. If they want to revoke they should revoke but the revocation to be approved by treasurer or approvers
+
+Approvals:
+    - After approving, the view does not get updated. Also why it is different to the loans view, it spans the entire width, while loan seems to be constricted to mobile type of view.
+    - When both approvals have been accepted, the loan card remains waiting for approval, it needs to update to display the latest status
+
+Post diburstment:
+    - LoandID should only show the correct status of the loan if the person viewing is not the owner of the loan
+
+Repayment:
+    - Paying what is on the card seems to leave a residual interest amount everytime, not sure if is interest calculated on that amount?
+    - What happens if I record a loan repayment greater than what is outstanding?

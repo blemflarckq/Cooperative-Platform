@@ -49,10 +49,14 @@ export function ApprovalsPage() {
     recordApproval.mutate(
       { schemeId, requestId, decision },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           toast.success(
             decision === "APPROVED" ? "Approval recorded" : "Request declined",
           );
+          // Explicit refetch in addition to the hook's own cache
+          // invalidation — belt-and-braces so the card's approval count
+          // (or its disappearance once fully decided) is never stale.
+          await requestsQuery.refetch();
         },
         onError: (error: unknown) => {
           const message =
@@ -64,7 +68,7 @@ export function ApprovalsPage() {
   }
 
   return (
-    <div>
+    <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
       <PageHeader title={pageTitle} description={pageDescription} />
 
       {requests.length === 0 ? (

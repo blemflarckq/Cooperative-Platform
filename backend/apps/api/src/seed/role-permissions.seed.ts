@@ -454,6 +454,7 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'loan:request',
     'loan:read',
     'loan:pledge',
+    'loan:record-repayment',
 
     // Reports
     "savings_statement:read",

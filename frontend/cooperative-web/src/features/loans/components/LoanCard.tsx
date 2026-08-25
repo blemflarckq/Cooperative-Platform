@@ -1,6 +1,7 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/formatting/currency";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 import type { Loan } from "../types/loan.types";
 
@@ -14,6 +15,8 @@ const STATUS_LABEL: Record<Loan["status"], string> = {
 
 export function LoanCard({ loan }: { loan: Loan }) {
   const { navigateToApp } = useTenantNavigation();
+  const { user } = useAuth();
+  const isBorrower = loan.borrower?.user?.id === user?.id;
   const outstanding =
     Number(loan.selfFundedOutstandingPrincipal) + Number(loan.peerFundedOutstandingPrincipal);
 
@@ -25,6 +28,14 @@ export function LoanCard({ loan }: { loan: Loan }) {
     >
       <Card className="flex flex-row items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0">
         <div>
+          <div className="mb-0.5 flex items-center gap-1.5">
+            <User className="size-3 text-[var(--muted-foreground)]" />
+            <span className="text-xs text-[var(--muted-foreground)]">
+              {isBorrower
+                ? "Your loan"
+                : `${loan.borrower?.user?.firstName ?? "Another member"}'s loan`}
+            </span>
+          </div>
           <div className="text-sm font-medium text-[var(--foreground)]">
             {formatCurrency(loan.principalAmount)}
           </div>
