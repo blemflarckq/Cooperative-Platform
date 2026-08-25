@@ -15,6 +15,8 @@ import { LoanRepaymentsService } from "./services/loan-repayments.service";
 import { LoanRateEscalationService } from "./services/loan-rate-escalation.service";
 import { LoanPolicyController } from "./controllers/loan-policy.controller";
 import { LoansController } from "./controllers/loans.controller";
+import { PaymentAllocationService } from "./services/payment-allocation.service";
+import { PaymentAllocationController } from "./controllers/payment-allocation.controller";
 
 @Module({
   imports: [
@@ -28,8 +30,10 @@ import { LoansController } from "./controllers/loans.controller";
     // Loans depends on SchemesModule for ActorTenantUserResolverService
     // and OutboundRequestsService — every loan disbursement flows through
     // the same 2-approver engine as any other withdrawal. It depends on
-    // AccountingModule for the posting engine and account resolver, since
-    // disbursement and repayment both post real journal entries.
+    // AccountingModule for the posting engine, account resolver, and
+    // ContributionsService — the payment allocation engine needs the
+    // latter to record whatever's left over after loan repayments as a
+    // real contribution, atomically alongside them.
     SchemesModule,
     AccountingModule,
   ],
@@ -40,8 +44,9 @@ import { LoansController } from "./controllers/loans.controller";
     LoanDisbursementService,
     LoanRepaymentsService,
     LoanRateEscalationService,
+    PaymentAllocationService,
   ],
-  controllers: [LoanPolicyController, LoansController],
+  controllers: [LoanPolicyController, LoansController, PaymentAllocationController],
   exports: [LoanPolicyService, LoansService],
 })
 export class LoansModule {}

@@ -1,18 +1,22 @@
-import { BriefcaseBusiness, HeartHandshake } from "lucide-react";
+import { BriefcaseBusiness, HeartHandshake, Wallet } from "lucide-react";
 
 import { NextActionCard } from "@/components/common/NextActionCard";
 import { PageHeader } from "@/components/common/PageHeader";
+import { PermissionGate } from "@/components/common/PermissionGate";
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
 import { Card, CardContent } from "@/components/ui/card";
 import { resolveDashboardNextAction } from "@/lib/domain/next-action";
 import { useExperienceMode } from "@/lib/experience/useExperienceMode";
+import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 
 import { SetupChecklistCard } from "../components/SetupChecklistCard";
 import { useDashboardSetupData } from "../hooks/useDashboardSetupData";
 
 export function DashboardPage() {
   const { isCommunityMode } = useExperienceMode();
+  const { navigateToApp } = useTenantNavigation();
   const setupData = useDashboardSetupData();
 
   if (setupData.isLoading) return <LoadingState />;
@@ -28,12 +32,25 @@ export function DashboardPage() {
     isCommunityMode,
   });
 
+  const recordPaymentButton = (
+    <PermissionGate permissions={["contribution:create"]}>
+      <Button
+        variant="outline"
+        onClick={() => navigateToApp("/record-payment")}
+      >
+        <Wallet className="mr-2 size-4" />
+        {isCommunityMode ? "Record a payment" : "Record a payment"}
+      </Button>
+    </PermissionGate>
+  );
+
   if (isCommunityMode) {
     return (
       <div>
         <PageHeader
           title="Welcome back"
           description="Run your community fund, track people, and record money safely."
+          actions={recordPaymentButton}
         />
 
         <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -58,6 +75,7 @@ export function DashboardPage() {
       <PageHeader
         title="Finance Dashboard"
         description="Professional view for accounting, reporting, and financial controls."
+        actions={recordPaymentButton}
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">

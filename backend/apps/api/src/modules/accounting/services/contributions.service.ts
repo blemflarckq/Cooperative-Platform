@@ -52,8 +52,9 @@ export class ContributionsService {
     cycleId: string,
     dto: CreateContributionDto,
     actorUserId?: string,
+    existingManager?: EntityManager,
   ): Promise<Contribution> {
-    return this.dataSource.transaction(async (manager) => {
+    const run = async (manager: EntityManager): Promise<Contribution> => {
       assertPositiveMoneyString(dto.amount, "amount");
 
       const cycle = await manager.findOne(OperatingCycle, {
@@ -195,7 +196,13 @@ export class ContributionsService {
           journalEntry: true,
         },
       });
-    });
+    };
+
+    if (existingManager) {
+      return run(existingManager);
+    }
+
+    return this.dataSource.transaction(run);
   }
 
   async findByCycle(

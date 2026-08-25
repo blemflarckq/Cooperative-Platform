@@ -38,13 +38,14 @@ export class LoanRepaymentsService {
     loanId: string,
     amount: string,
     actorUserId: string,
+    existingManager?: EntityManager,
   ): Promise<Loan> {
     const paymentAmount = Number(amount);
     if (!(paymentAmount > 0)) {
       throw new BadRequestException("amount must be greater than zero.");
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const run = async (manager: EntityManager): Promise<Loan> => {
       await this.actorResolver.resolve(manager, tenantId, actorUserId);
 
       const loan = await manager.findOne(Loan, {
@@ -215,7 +216,13 @@ export class LoanRepaymentsService {
       }
 
       return loan;
-    });
+    };
+
+    if (existingManager) {
+      return run(existingManager);
+    }
+
+    return this.dataSource.transaction(run);
   }
 
   private async postRepaymentJournalEntry(

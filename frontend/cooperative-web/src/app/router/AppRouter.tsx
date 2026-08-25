@@ -16,6 +16,7 @@ import { ContributionsPage } from "@/features/contributions/pages/ContributionsP
 import { LoansPage } from "@/features/loans/pages/LoansPage";
 import { RequestLoanPage } from "@/features/loans/pages/RequestLoanPage";
 import { LoanDetailPage } from "@/features/loans/pages/LoanDetailPage";
+import { RecordPaymentPage } from "@/features/payments/pages/RecordPaymentPage";
 import { ApprovalsPage } from "@/features/approvals/pages/ApprovalsPage";
 import { PayoutsPage } from "@/features/payouts/pages/PayoutsPage";
 import { AuditPage } from "@/features/audit/pages/AuditPage";
@@ -152,6 +153,7 @@ export function AppRouter() {
             <Route path="cycles" element={<CyclesPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="contributions" element={<ContributionsPage />} />
+            <Route path="record-payment" element={<RecordPaymentPage />} />
             <Route path="loans/:loanId" element={<LoanDetailPage />} />
             <Route path="payouts" element={<PayoutsPage />} />
             <Route path="audit" element={<AuditPage />} />
