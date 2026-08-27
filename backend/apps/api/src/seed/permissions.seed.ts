@@ -205,6 +205,17 @@ const PERMISSIONS: Array<{
   },
 
   // =========================
+  // PAYMENT ALLOCATION
+  // =========================
+  {
+    resource: "payment",
+    actions: [
+      { action: "record", description: "Record a payment received from a member (staff only — the first, standalone step)" },
+      { action: "allocate", description: "Allocate a recorded payment against obligations (self-service primarily; staff may assist)" },
+    ],
+  },
+
+  // =========================
   // CONTRIBUTIONS
   // =========================
   {

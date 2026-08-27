@@ -18,6 +18,16 @@ export async function getTenantUsers(): Promise<TenantUserListItem[]> {
 }
 
 /**
+ * Resolves the caller's own tenant-user record — needed by any
+ * self-service flow (like allocating your own recorded payment) that
+ * operates on tenantUserId rather than the raw userId in the JWT.
+ */
+export async function getCurrentTenantUser(): Promise<TenantUserListItem> {
+  const response = await apiClient.get<TenantUserResponse>("/tenant-users/me");
+  return mapTenantUserToListItem(response.data);
+}
+
+/**
  * Search-as-you-type lookup, reused by the payment allocation feature's
  * payer selector — the actual design-debt fix flagged early in this
  * project ("a dropdown wants everyone, pagination fights that") finally

@@ -1,3 +1,18 @@
+export type RecordedPaymentStatus = "UNALLOCATED" | "ALLOCATED";
+
+export interface RecordedPayment {
+  id: string;
+  tenantId: string;
+  tenantUserId: string;
+  amount: string;
+  recordedByTenantUserId: string;
+  recordedAt: string;
+  status: RecordedPaymentStatus;
+  notes: string | null;
+  allocatedAt: string | null;
+  allocatedByTenantUserId: string | null;
+}
+
 export interface OutstandingLoanObligation {
   loanId: string;
   schemeId: string;
@@ -18,6 +33,12 @@ export interface OutstandingObligations {
   remainderTargets: RemainderTarget[];
 }
 
+export interface RecordPaymentRequest {
+  tenantUserId: string;
+  amount: string;
+  notes?: string;
+}
+
 export interface LoanAllocationLine {
   loanId: string;
   amount: string;
@@ -29,7 +50,6 @@ export interface RemainderAllocation {
 }
 
 export interface AllocatePaymentRequest {
-  totalAmount: string;
   loanAllocations: LoanAllocationLine[];
   remainder?: RemainderAllocation;
 }

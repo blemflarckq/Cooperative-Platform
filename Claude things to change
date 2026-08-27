@@ -15,3 +15,15 @@ Post diburstment:
 Repayment:
     - Paying what is on the card seems to leave a residual interest amount everytime, not sure if is interest calculated on that amount?
     - What happens if I record a loan repayment greater than what is outstanding?
+
+
+25 August 2026:
+    - Loans in the loans view should separate own loans and other memebers loans. Other member's loans should also be annoted accordingly instead of other members loan
+    - during pledging, present fullfilled amount in a different way to yet to be fulfilled, so that one doesn't necessarily need to get into the print of one against the other to see what is happening, as a ux expert make it such that the story is visually intuitive even if there will be text descriptions
+    - If I am pledging show the amount I have available that I can use to pledge with
+    - add breadcrumbs with a back arrow on the loans view
+    - Perhaps in the loan card show a visual with pledge weigtings
+    - remove approval view if you are not an approver
+    - When a loan is approved, the x of 2 aprovals is fine, but for the approver when they have approved, the approve button should disappear, to be replaced with some with more feedback and perhaps a back button.
+    - remove the record payment in loan card, this should be done through allocations. treasures, admins and committee members are the only ones that can do allocations on behalf of memebers. even then it should be a control that is not primary.
+    - the allocations view needs ux expert review, the rounded corners on obligations overlaps with the texts, its just untidy.

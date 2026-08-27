@@ -18,6 +18,7 @@ import { SchemesModule } from "./modules/schemes/schemes.module";
 import { AccountingModule } from "./modules/accounting/accounting.module";
 import { HealthModule } from "./common/health/health.module";
 import { LoansModule } from "./modules/loans/loans.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
 /**
  * AppModule wires global guards/interceptors.
  *
@@ -38,6 +39,7 @@ import { LoansModule } from "./modules/loans/loans.module";
     AccountingModule,
     HealthModule,
     LoansModule,
+    PaymentsModule,
     // Baseline rate limiting: 100 requests per 60s window per client by
     // default. Money-moving endpoints (login, transfers) can override this
     // per-route with @Throttle() later if a tighter limit is warranted.

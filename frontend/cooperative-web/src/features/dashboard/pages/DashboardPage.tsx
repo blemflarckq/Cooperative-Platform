@@ -33,15 +33,31 @@ export function DashboardPage() {
   });
 
   const recordPaymentButton = (
-    <PermissionGate permissions={["contribution:create"]}>
+    <PermissionGate permissions={["payment:record"]}>
       <Button
         variant="outline"
         onClick={() => navigateToApp("/record-payment")}
       >
         <Wallet className="mr-2 size-4" />
-        {isCommunityMode ? "Record a payment" : "Record a payment"}
+        Record a payment
       </Button>
     </PermissionGate>
+  );
+
+  // Self-service — available to every role, since allocating your own
+  // recorded payment shouldn't require any special staff permission.
+  const myPaymentsButton = (
+    <Button variant="outline" onClick={() => navigateToApp("/payments")}>
+      <Wallet className="mr-2 size-4" />
+      Your payments
+    </Button>
+  );
+
+  const dashboardActions = (
+    <div className="flex flex-wrap gap-2">
+      {myPaymentsButton}
+      {recordPaymentButton}
+    </div>
   );
 
   if (isCommunityMode) {
@@ -50,7 +66,7 @@ export function DashboardPage() {
         <PageHeader
           title="Welcome back"
           description="Run your community fund, track people, and record money safely."
-          actions={recordPaymentButton}
+          actions={dashboardActions}
         />
 
         <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -75,7 +91,7 @@ export function DashboardPage() {
       <PageHeader
         title="Finance Dashboard"
         description="Professional view for accounting, reporting, and financial controls."
-        actions={recordPaymentButton}
+        actions={dashboardActions}
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">

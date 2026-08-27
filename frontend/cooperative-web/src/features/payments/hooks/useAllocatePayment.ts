@@ -2,24 +2,23 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { allocatePayment } from "../api/payment-allocation.api";
 import type { AllocatePaymentRequest } from "../types/payment-allocation.types";
 
-export function useAllocatePayment() {
+export function useAllocatePayment(tenantUserId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({
-      tenantUserId,
+      recordedPaymentId,
       payload,
     }: {
-      tenantUserId: string;
+      recordedPaymentId: string;
       payload: AllocatePaymentRequest;
-    }) => allocatePayment(tenantUserId, payload),
+    }) => allocatePayment(recordedPaymentId, payload),
 
     onSuccess: async () => {
-      // Broad invalidation — this single action can touch multiple loans
-      // plus a contribution, spanning query keys we don't want to
-      // enumerate one by one here.
       await queryClient.invalidateQueries({ queryKey: ["loans"] });
-      await queryClient.invalidateQueries({ queryKey: ["payment-allocation"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["payment-allocation", "unallocated", tenantUserId],
+      });
     },
   });
 }

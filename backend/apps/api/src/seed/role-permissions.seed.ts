@@ -110,6 +110,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'loan-policy:read',
     'loan-policy:manage',
 
+    // Payment allocation
+    'payment:record',
+    'payment:allocate',
+
     // Contributions
     'subscription:create',
     'subscription:read',
@@ -257,6 +261,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'loan-policy:read',
     'loan-policy:manage',
 
+    // Payment allocation
+    'payment:record',
+    'payment:allocate',
+
     // Contributions
     'subscription:create',
     'subscription:read',
@@ -315,6 +323,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'outbound-request:initiate',
     'outbound-request:approve',
     'loan-policy:read',
+
+    // Payment allocation
+    'payment:record',
+    'payment:allocate',
     'approval-policy:read',
 
     // Reports
@@ -415,6 +427,9 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
 
     // Loan policy
     'loan-policy:read',
+
+    // Payment allocation — self-service only, no payment:record
+    'payment:allocate',
 
     // Subscriptions
     'subscription:create',

@@ -56,6 +56,26 @@ export class TenantUsersController {
     return rows.map(TenantUserResponseMapper.toResponse);
   }
 
+  /**
+   * Must stay registered before ':tenantUserId' below — NestJS matches
+   * routes in declaration order, and 'me' would otherwise be swallowed by
+   * the wildcard param route. No permission required beyond being an
+   * authenticated, active tenant member — this only ever returns the
+   * caller's own record.
+   */
+  @Get('me')
+  async getCurrentTenantUser(
+    @TenantId() tenantId: string,
+    @CurrentUser() actorUserId: string,
+  ) {
+    const entity = await this.tenantUsersService.getForCurrentUser(
+      tenantId,
+      actorUserId,
+    );
+
+    return TenantUserResponseMapper.toResponse(entity);
+  }
+
   @Get(':tenantUserId')
   @RequirePermissions('user:read')
   async getOne(

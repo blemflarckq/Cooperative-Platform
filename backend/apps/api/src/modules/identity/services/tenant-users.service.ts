@@ -311,6 +311,32 @@ async createWithTemporaryPassword(params: {
   }
 
   /**
+   * Resolves the caller's OWN tenant-user record from their JWT's raw
+   * userId — needed anywhere a self-service action (like allocating your
+   * own recorded payment) operates on tenantUserId, not userId, and the
+   * caller might not hold the broader user:read permission needed to look
+   * anyone up via the general list/get endpoints.
+   */
+  async getForCurrentUser(tenantId: string, userId: string): Promise<TenantUser> {
+    const entity = await this.tenantUsersRepository.findOne({
+      where: {
+        userId,
+        tenantId,
+        isActive: true,
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    if (!entity) {
+      throw new NotFoundException('You are not an active member of this tenant.');
+    }
+
+    return entity;
+  }
+
+  /**
    * Updates tenant-specific membership and selected global user fields.
    */
   async updateTenantUser(
