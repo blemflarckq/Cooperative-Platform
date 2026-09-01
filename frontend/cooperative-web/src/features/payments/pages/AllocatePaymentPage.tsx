@@ -120,16 +120,16 @@ export function AllocatePaymentPage() {
       {obligations.loans.map((loan) => (
         <Card
           key={loan.loanId}
-          className={`rounded-2xl p-3.5 shadow-none ring-0 ${
+          className={`rounded-2xl p-4 shadow-none ring-0 ${
             loan.isAtRiskFlagged
               ? "border border-[var(--destructive)]/40"
               : "border border-[var(--border)]"
           }`}
         >
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               {loan.isAtRiskFlagged && (
-                <AlertTriangle className="size-3.5 text-[var(--destructive)]" />
+                <AlertTriangle className="size-3.5 shrink-0 text-[var(--destructive)]" />
               )}
               <span className="text-sm font-medium">{loan.schemeName} loan</span>
             </div>
@@ -139,11 +139,11 @@ export function AllocatePaymentPage() {
               <span className="text-xs text-[var(--muted-foreground)]">{loan.currentRate}% rate</span>
             )}
           </div>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-[var(--muted-foreground)]">
               {formatCurrency(loan.payoffAmount)} owed, including interest
             </span>
-            <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-1">
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] px-2.5 py-1.5">
               <span className="text-xs text-[var(--muted-foreground)]">M</span>
               <input
                 value={resolvedLines[loan.loanId] ?? ""}
@@ -159,7 +159,7 @@ export function AllocatePaymentPage() {
       ))}
 
       {remainderAmount > 0 && (
-        <Card className="rounded-2xl border border-dashed border-[var(--border)] p-3.5 shadow-none ring-0">
+        <Card className="rounded-2xl border border-dashed border-[var(--border)] p-4 shadow-none ring-0">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-sm font-medium">Remaining, as savings</span>
             {obligations.remainderTargets.length > 1 ? (

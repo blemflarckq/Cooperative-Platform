@@ -30,6 +30,12 @@ export interface LoanPledge {
   };
 }
 
+export interface LoanOutboundRequestSummary {
+  id: string;
+  status: "INITIATED" | "APPROVED" | "REJECTED" | "EXECUTED";
+  approvals?: { id: string; decision: "APPROVED" | "REJECTED" }[];
+}
+
 export interface Loan {
   id: string;
   tenantId: string;
@@ -53,6 +59,7 @@ export interface Loan {
   createdAt: string;
   updatedAt: string;
   pledges?: LoanPledge[];
+  outboundRequest?: LoanOutboundRequestSummary | null;
   borrower?: {
     id: string;
     user: LoanMemberSummary | null;

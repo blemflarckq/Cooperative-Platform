@@ -30,7 +30,11 @@ export class LoansService {
   async findOne(tenantId: string, loanId: string): Promise<Loan> {
     const loan = await this.dataSource.getRepository(Loan).findOne({
       where: { id: loanId, tenantId },
-      relations: { pledges: { pledgingTenantUser: { user: true } }, borrower: { user: true } },
+      relations: {
+        pledges: { pledgingTenantUser: { user: true } },
+        borrower: { user: true },
+        outboundRequest: { approvals: true },
+      },
     });
 
     if (!loan) {
@@ -43,7 +47,15 @@ export class LoansService {
   async findAllForScheme(tenantId: string, schemeId: string): Promise<Loan[]> {
     return this.dataSource.getRepository(Loan).find({
       where: { tenantId, schemeId },
-      relations: { pledges: true },
+      // Same depth as findOne() — the "is this your loan" check that
+      // drives ownership labels, the pledge-eligibility check, and the
+      // pledge-story visual all depend on borrower.user actually being
+      // loaded here, not just on the single-loan view.
+      relations: {
+        pledges: { pledgingTenantUser: { user: true } },
+        borrower: { user: true },
+        outboundRequest: { approvals: true },
+      },
       order: { createdAt: "DESC" },
     });
   }
@@ -210,6 +222,38 @@ export class LoansService {
       }
 
       return saved;
+    });
+  }
+
+  /**
+   * How much of the viewer's own balance is genuinely free to pledge
+   * toward THIS loan right now — surfaced so a pledger never has to
+   * guess or discover a rejection after the fact.
+   */
+  async getPledgeCapacity(
+    tenantId: string,
+    loanId: string,
+    actorUserId: string,
+  ): Promise<{ availableAmount: string }> {
+    const loan = await this.dataSource.getRepository(Loan).findOne({
+      where: { id: loanId, tenantId },
+    });
+
+    if (!loan) {
+      throw new NotFoundException("Loan not found.");
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const actor = await this.actorResolver.resolve(manager, tenantId, actorUserId);
+
+      const available = await this.memberBalanceService.getAvailablePledgeCapacity(
+        manager,
+        tenantId,
+        loan.cycleId,
+        actor.id,
+      );
+
+      return { availableAmount: available.toFixed(2) };
     });
   }
 

@@ -52,6 +52,13 @@ export async function requestLoan(
   return response.data;
 }
 
+export async function getPledgeCapacity(loanId: string): Promise<{ availableAmount: string }> {
+  const response = await apiClient.get<{ availableAmount: string }>(
+    `/loans/${loanId}/pledge-capacity`,
+  );
+  return response.data;
+}
+
 export async function pledgeToLoan(
   loanId: string,
   payload: PledgeLoanRequest,

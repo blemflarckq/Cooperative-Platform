@@ -72,6 +72,64 @@ const lifecycleMap: Record<string, LifecyclePresentation> = {
     label: "Pending",
     description: "Awaiting completion.",
   },
+
+  // Loans
+  PENDING_PLEDGES: {
+    label: "Waiting for your group",
+    description: "This loan needs members to pledge before it can be approved.",
+  },
+
+  PENDING_APPROVAL: {
+    label: "Waiting on approval",
+    description: "This loan is waiting on the required approvals.",
+  },
+
+  AT_RISK: {
+    label: "Needs attention",
+    description: "This loan's peer-funded rate reached its cap.",
+  },
+
+  REPAID: {
+    label: "Fully repaid",
+    description: "This loan has been fully paid back.",
+  },
+
+  LOAN_READY_TO_DISBURSE: {
+    label: "Approved, ready to send",
+    description: "Both approvals are in — the funds can now be disbursed.",
+  },
+
+  // Outbound requests (approvals)
+  INITIATED: {
+    label: "Waiting on approval",
+    description: "This request is waiting on the required approvals.",
+  },
+
+  APPROVED: {
+    label: "Approved",
+    description: "This request has been fully approved.",
+  },
+
+  REJECTED: {
+    label: "Declined",
+    description: "This request was declined.",
+  },
+
+  EXECUTED: {
+    label: "Completed",
+    description: "This request has been carried out.",
+  },
+
+  // Payment allocation
+  UNALLOCATED: {
+    label: "Waiting for you to allocate",
+    description: "This payment has been recorded but not yet applied to anything.",
+  },
+
+  ALLOCATED: {
+    label: "Allocated",
+    description: "This payment has been applied.",
+  },
 };
 
 export function getLifecyclePresentation(

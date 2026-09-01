@@ -65,6 +65,16 @@ export class LoansController {
     return this.loansService.requestLoan(tenantId, schemeId, dto, actorUserId);
   }
 
+  @Get("loans/:loanId/pledge-capacity")
+  @RequirePermissions("loan:pledge")
+  async getPledgeCapacity(
+    @TenantId() tenantId: string,
+    @CurrentUser() actorUserId: string,
+    @Param("loanId") loanId: string,
+  ) {
+    return this.loansService.getPledgeCapacity(tenantId, loanId, actorUserId);
+  }
+
   @Post("loans/:loanId/pledges")
   @RequirePermissions("loan:pledge")
   async pledge(

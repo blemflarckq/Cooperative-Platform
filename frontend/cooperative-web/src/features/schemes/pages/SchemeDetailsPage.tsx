@@ -170,7 +170,7 @@ export function SchemeDetailsPage() {
         backLabel={backLabel}
         actions={
           <div className="flex flex-wrap gap-2">
-            <PermissionGate permissions={["outbound-request:read"]}>
+            <PermissionGate permissions={["outbound-request:approve"]}>
               <Button
                 variant="outline"
                 onClick={() => navigate(appPath(`/schemes/${scheme.id}/approvals`))}

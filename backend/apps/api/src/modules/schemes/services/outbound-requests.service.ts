@@ -60,7 +60,13 @@ export class OutboundRequestsService {
   ): Promise<OutboundRequest[]> {
     return this.dataSource.getRepository(OutboundRequest).find({
       where: { tenantId, schemeId },
-      relations: { approvals: true },
+      // Deliberately the same depth as findOne() below — every
+      // viewer-identity check in the UI (is this my request, have I
+      // already decided, who initiated this) depends on these nested
+      // .user relations actually being loaded. A shallower list query
+      // doesn't just show less data, it silently breaks those checks —
+      // exactly what happened here before this fix.
+      relations: { approvals: { approver: { user: true } }, initiatedBy: { user: true } },
       order: { createdAt: "DESC" },
     });
   }

@@ -27,6 +27,9 @@ export function OutboundRequestCard({
   isSubmitting,
 }: OutboundRequestCardProps) {
   const isOwnRequest = request.initiatedBy?.user?.id === currentUserId;
+  const viewerDecision = (request.approvals ?? []).find(
+    (approval) => approval.approver?.user?.id === currentUserId,
+  )?.decision;
   const approvedCount = (request.approvals ?? []).filter(
     (approval) => approval.decision === "APPROVED",
   ).length;
@@ -60,6 +63,21 @@ export function OutboundRequestCard({
       {isOwnRequest ? (
         <div className="rounded-xl bg-[var(--secondary)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
           You initiated this, you can't approve your own request.
+        </div>
+      ) : viewerDecision ? (
+        <div
+          className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs ${
+            viewerDecision === "APPROVED"
+              ? "bg-[var(--success)]/10 text-[var(--success)]"
+              : "bg-[var(--destructive)]/10 text-[var(--destructive)]"
+          }`}
+        >
+          <CheckCircle2 className="size-3.5 shrink-0" />
+          <span>
+            {viewerDecision === "APPROVED"
+              ? `You approved this — ${approvedCount} of ${requiredApprovals} approvals so far.`
+              : "You declined this."}
+          </span>
         </div>
       ) : (
         <>

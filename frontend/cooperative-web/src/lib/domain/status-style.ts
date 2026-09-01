@@ -8,22 +8,39 @@ export type StatusTone =
 const statusToneMap: Record<string, StatusTone> = {
   ACTIVE: "success",
   OPEN: "success",
+  APPROVED: "success",
+  REPAID: "success",
+  ALLOCATED: "success",
 
   POSTED: "info",
   CLOSED: "info",
   EXITED: "info",
+  EXECUTED: "info",
 
   DRAFT: "neutral",
   PENDING: "neutral",
 
   PAUSED: "warning",
   SUSPENDED: "warning",
+  PENDING_PLEDGES: "warning",
+  PENDING_APPROVAL: "warning",
+  INITIATED: "warning",
+  UNALLOCATED: "warning",
 
   CANCELLED: "danger",
   ARCHIVED: "danger",
   REVERSED: "danger",
   REMOVED: "danger",
   INACTIVE: "danger",
+  AT_RISK: "danger",
+  REJECTED: "danger",
+
+  // Derived, frontend-only state — not a real backend status, computed
+  // when a loan's status is PENDING_APPROVAL but its outbound request has
+  // actually reached APPROVED. This is the specific fix for "stays as
+  // awaiting approval" — the decision genuinely is complete, so it reads
+  // as success, distinct from still-waiting PENDING_APPROVAL above.
+  LOAN_READY_TO_DISBURSE: "success",
 };
 
 export function getStatusTone(status?: string | null): StatusTone {

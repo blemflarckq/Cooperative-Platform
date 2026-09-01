@@ -15,7 +15,7 @@ import { useSchemeOutboundRequests } from "../hooks/useSchemeOutboundRequests";
 
 export function ApprovalsPage() {
   const { schemeId } = useParams<{ schemeId: string }>();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { isCommunityMode } = useExperienceMode();
   const recordApproval = useRecordApproval();
 
@@ -25,6 +25,12 @@ export function ApprovalsPage() {
   const pageDescription = isCommunityMode
     ? "Requests that need your decision before money can move."
     : "Outbound requests awaiting the required approvals for this scheme.";
+
+  // Not just a hidden entry-point button — someone navigating here
+  // directly without being an approver shouldn't see this view at all.
+  if (!hasPermission(["outbound-request:approve"])) {
+    return <ErrorState title="You don't have access to this page" />;
+  }
 
   if (!schemeId) return <ErrorState title="No scheme selected" />;
   if (requestsQuery.isLoading) return <LoadingState />;

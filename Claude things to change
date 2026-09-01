@@ -27,3 +27,9 @@ Repayment:
     - When a loan is approved, the x of 2 aprovals is fine, but for the approver when they have approved, the approve button should disappear, to be replaced with some with more feedback and perhaps a back button.
     - remove the record payment in loan card, this should be done through allocations. treasures, admins and committee members are the only ones that can do allocations on behalf of memebers. even then it should be a control that is not primary.
     - the allocations view needs ux expert review, the rounded corners on obligations overlaps with the texts, its just untidy.
+27 August 2026:
+    - In loan requests, color from own savings in green and group fund to amber, I think colors communicate soo much of what the current system status against the ideal status as well as what needs to be done to get to ideal state. This is just a suggestion to ensure Visibility of System Status at all times you may have a better suggestion. 
+    - segment other members loans with own loans. Also own loan card still shows as another member's loan
+    - user feedback on the approval process was not dealt with from the previouis UI review. I hit approve and the approve and decline button dont change, I think i had mentioned this before?
+    - also lets communicate back to the user a correct status of a single, loan on the loan card at every stage. example is when a loan has been approved by the 2 approvers, it stays as awaiting approval.
+    - to add onto this, perhaps lets standardize on a way to communicate the status of a work flow for each process and adopt standard colors for success, failure, not started, pending and everything in between. use your expertise as graphics and webdesigner and UX expert. I am not sure if you understand my intention here but I want the user experience to be fulfilling and happy. 
