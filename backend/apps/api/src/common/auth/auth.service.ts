@@ -5,8 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import type { StringValue } from "ms";
-import { JwtService, JwtSignOptions  } from "@nestjs/jwt";
+import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
@@ -15,44 +14,56 @@ import { User } from "../../modules/identity/entities/user.entity";
 import { Tenant } from "../../modules/identity/entities/tenant.entity";
 import { TenantUser } from "../../modules/identity/entities/tenant-user.entity";
 import { TenantUserRole } from "../../modules/identity/entities/tenant-user-role.entity";
-import { hashPassword } from '../../common/auth/password';
+import { hashPassword } from "../../common/auth/password";
 import { getRequiredEnv } from "../../config/env";
+import type { AuthJwtPayload } from "./jwt.types";
 
 /**
- * AuthService is tenant-aware:
- * - user authenticates with email/password + tenantSlug
- * - we validate membership in that tenant
- * - we expand roles -> permissions for that tenant
- * - we issue JWT bound to tenantId
+ * AuthService — tenant resolution now happens automatically after
+ * identity is confirmed, instead of requiring the caller to already know
+ * a tenant slug. Someone can belong to zero, one, or several tenants;
+ * this handles all three without ever asking for a slug.
+ *
+ * PINNED: identity verification (verifyIdentity, below) is deliberately
+ * isolated as its own step, separate from tenant resolution. Today it's
+ * email + password. When phone + OTP is eventually built (flagged as
+ * high-priority, parked only on the SMS provider dependency — see the
+ * roadmap doc), it becomes a second identity-verification path that
+ * feeds the exact same resolveTenantsAndIssueSession() below — tenant
+ * resolution, the pre-auth token mechanism, and the tenant picker don't
+ * need to be touched at all when that day comes.
  */
+
+export interface AuthenticatedTenantUserResponse {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  tenantId: string;
+  tenantName: string;
+  roles: string[];
+  permissions: string[];
+  mustChangePassword: boolean;
+}
 
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    tenantId: string;
-    tenantName: string;
-    roles: string[];
-    permissions: string[];
-    mustChangePassword: boolean;
-
-  };
+  user: AuthenticatedTenantUserResponse;
 }
 
-type TokenType = "access" | "refresh";
-
-interface AuthJwtPayload {
-  sub: string;
-  tenantId: string;
-  tenantSlug: string;
-  roles: string[];
-  permissions: string[];
-  tokenType: TokenType;
+export interface TenantOption {
+  id: string;
+  name: string;
+  slug: string;
 }
+
+export type AuthResult =
+  | ({ status: "authenticated" } & LoginResponse)
+  | { status: "select_tenant"; preAuthToken: string; tenants: TenantOption[] }
+  | { status: "no_tenant"; preAuthToken: string };
+
+const PRE_AUTH_TOKEN_TTL = "5m";
 
 @Injectable()
 export class AuthService {
@@ -72,39 +83,116 @@ export class AuthService {
     private readonly tenantUserRoles: Repository<TenantUserRole>,
   ) {}
 
-  async login(params: {
-    email: string;
-    password: string;
-    tenantSlug: string;
-  }): Promise<LoginResponse> {
-    const email = params.email.trim().toLowerCase();
-    const tenantSlug = params.tenantSlug.trim().toLowerCase();
+  async login(params: { email: string; password: string }): Promise<AuthResult> {
+    const user = await this.verifyIdentity(params.email, params.password);
+    return this.resolveTenantsAndIssueSession(user);
+  }
 
-    const tenant = await this.tenants.createQueryBuilder("tenant")
-      .where("tenant.slug = :slug", {slug: tenantSlug})
-      .andWhere("tenant.isActive= :active", {active: true})
-      .getOne();
+  /**
+   * Isolated identity-verification step — the seam described above.
+   * Everything after this point (tenant resolution) is identical no
+   * matter how identity was confirmed.
+   */
+  private async verifyIdentity(email: string, password: string): Promise<User> {
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!tenant) {
-      throw new UnauthorizedException("Invalid tenant or tenant inactive");
-    }
-
-    const user = await this.users.createQueryBuilder("user")
-      .where("user.email = :email", { email })
-      .andWhere("user.isActive= :active", { active: true })
+    const user = await this.users
+      .createQueryBuilder("user")
+      .where("user.email = :email", { email: normalizedEmail })
+      .andWhere("user.isActive = :active", { active: true })
       .getOne();
 
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    const passwordOk = await verifyPassword(params.password, user.passwordHash);
+    const passwordOk = await verifyPassword(password, user.passwordHash);
 
     if (!passwordOk) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    return this.buildLoginResponse(user, tenant);
+    return user;
+  }
+
+  /**
+   * Given a confirmed identity, works out what happens next: straight
+   * in (exactly one active tenant), a picker (several), or routed to
+   * setup (none yet).
+   */
+  private async resolveTenantsAndIssueSession(user: User): Promise<AuthResult> {
+    const memberships = await this.tenantUsers.find({
+      where: { userId: user.id, isActive: true },
+      relations: { tenant: true },
+    });
+
+    const activeMemberships = memberships.filter(
+      (membership) => membership.tenant?.isActive,
+    );
+
+    if (activeMemberships.length === 0) {
+      const preAuthToken = await this.issuePreAuthToken(user.id);
+      return { status: "no_tenant", preAuthToken };
+    }
+
+    if (activeMemberships.length === 1) {
+      const response = await this.buildLoginResponse(
+        user,
+        activeMemberships[0].tenant,
+      );
+      return { status: "authenticated", ...response };
+    }
+
+    const preAuthToken = await this.issuePreAuthToken(user.id);
+    return {
+      status: "select_tenant",
+      preAuthToken,
+      tenants: activeMemberships.map((membership) => ({
+        id: membership.tenant.id,
+        name: membership.tenant.name ?? membership.tenant.slug,
+        slug: membership.tenant.slug,
+      })),
+    };
+  }
+
+  /**
+   * Second step for the multi-tenant case — exchanges a pre-auth token
+   * (identity already confirmed, no tenant chosen yet) plus a chosen
+   * tenant for a real, tenant-scoped session.
+   */
+  async selectTenant(preAuthToken: string, tenantId: string): Promise<LoginResponse> {
+    let payload: AuthJwtPayload;
+
+    try {
+      payload = await this.jwt.verifyAsync<AuthJwtPayload>(preAuthToken, {
+        secret: getRequiredEnv("JWT_ACCESS_SECRET"),
+      });
+    } catch {
+      throw new UnauthorizedException("Invalid or expired session — please log in again.");
+    }
+
+    if (payload.tokenType !== "pre_auth") {
+      throw new UnauthorizedException("Invalid token for tenant selection.");
+    }
+
+    const user = await this.users.findOne({
+      where: { id: payload.sub, isActive: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("User account is inactive or no longer exists.");
+    }
+
+    const membership = await this.tenantUsers.findOne({
+      where: { userId: user.id, tenantId, isActive: true },
+      relations: { tenant: true },
+    });
+
+    if (!membership || !membership.tenant?.isActive) {
+      throw new ForbiddenException("You do not belong to that cooperative.");
+    }
+
+    return this.buildLoginResponse(user, membership.tenant);
   }
 
   async refresh(refreshToken: string): Promise<LoginResponse> {
@@ -118,7 +206,7 @@ export class AuthService {
       throw new UnauthorizedException("Invalid or expired refresh token");
     }
 
-    if (payload.tokenType !== "refresh") {
+    if (payload.tokenType !== "refresh" || !payload.tenantId) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
@@ -268,6 +356,25 @@ export class AuthService {
       refreshToken,
     };
   }
+
+  /**
+   * Deliberately minimal payload — sub + tokenType only, no
+   * tenantId/roles/permissions — so this token is structurally
+   * incapable of being mistaken for a real session anywhere else in the
+   * app (JwtStrategy now rejects anything that isn't tokenType:
+   * "access" outright, and even if that check didn't exist, every
+   * tenant-scoped or permission-gated route would fail on the missing
+   * claims). Good for exactly one thing: calling selectTenant().
+   */
+  private async issuePreAuthToken(userId: string): Promise<string> {
+    const payload: AuthJwtPayload = {
+      sub: userId,
+      tokenType: "pre_auth",
+    };
+
+    return this.jwt.signAsync(payload, { expiresIn: PRE_AUTH_TOKEN_TTL });
+  }
+
   private getRefreshSecret(): string {
     return getRequiredEnv("JWT_REFRESH_SECRET");
   }
@@ -359,5 +466,4 @@ export class AuthService {
 
     return { success: true };
   }
-
 }

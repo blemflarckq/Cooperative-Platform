@@ -1,23 +1,16 @@
 import { Body, Controller, Post, Get, Headers, Res, HttpStatus } from "@nestjs/common";
 import { type Response } from 'express';
-import { AuthService, LoginResponse } from "./auth.service";
+import { AuthService, AuthResult, LoginResponse } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
+import { SelectTenantDto } from "./dto/select-tenant.dto";
 import { Public } from "./public.decorator";
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CurrentUser } from './current-user.decorator';
 import { TenantUserInvitationsService } from '../../modules/identity/services/tenant-user-invitations.service';
 import { TenantUsersService } from '../../modules/identity/services/tenant-users.service'
-import { TenantId } from '../../common/tenancy/tenant-id.decorator';
 import { AcceptInvitationDto } from '../../modules/identity/dto/accept-invitation.dto';
-import { RequirePermissions } from '../../common/rbac/require-permissions.decorator';
-//import { CreateTempPasswordUserDto } from '../../modules/identity/dto/create-temp-password-user.dto';
 
-
-/**
- * Auth endpoints are intentionally small for Phase 1.
- * We'll extend later with refresh/logout/session tracking if needed.
- */
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -26,20 +19,31 @@ export class AuthController {
     private readonly tenantUsersService: TenantUsersService,
   ) {}
 
+  /**
+   * No tenant slug required — identity alone. Returns one of three
+   * shapes (see AuthResult): straight in, pick a tenant, or no tenant
+   * yet. The frontend branches on `status`.
+   */
   @Public()
   @Post("login")
-  async login(@Body() dto: LoginDto): Promise<LoginResponse> {
-    const result = await this.auth.login(dto);
-    //console.log('controller received result, sending to Postman', result.user.tenantName)
-    return result;
+  async login(@Body() dto: LoginDto): Promise<AuthResult> {
+    return this.auth.login(dto);
+  }
+
+  /**
+   * Second step for the multi-tenant case — exchanges a pre-auth token
+   * plus a chosen tenant for a real session.
+   */
+  @Public()
+  @Post("select-tenant")
+  async selectTenant(@Body() dto: SelectTenantDto): Promise<LoginResponse> {
+    return this.auth.selectTenant(dto.preAuthToken, dto.tenantId);
   }
 
   @Public()
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto, @Res() res: Response) {
     const result = await this.auth.refresh(dto.refreshToken);
-    console.log('Sending refresh results', result);
-    //return result;
     res.status(HttpStatus.OK).json(result);
   }
 
@@ -50,7 +54,6 @@ export class AuthController {
   ) {
     return this.auth.me(userId, tenantId);
   }
-
 
   @Public()
   @Post('accept-invitation')
@@ -65,26 +68,9 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return await this.auth.changePassword({
-      userId, 
+      userId,
       currentPassword: dto.currentPassword,
       newPassword: dto.newPassword,
     });
   }
-  
-
-  
-/*  @Post('temp-password')
-  @RequirePermissions('tenant_users:create_temp_password')
-  createTempPasswordUser(
-    @TenantId() tenantId: string,
-    @CurrentUser('sub') actorUserId: string,
-    @Body() dto: CreateTempPasswordUserDto,
-  ) {
-    return this.tenantUsersService.createWithTemporaryPassword({
-      tenantId,
-      actorUserId,
-      dto,
-    });
-  }
-*/
 }

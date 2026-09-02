@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
-import type { AccessTokenPayload, AuthenticatedUser } from "./jwt.types";
+import type { AuthJwtPayload, AuthenticatedUser } from "./jwt.types";
 import { getRequiredEnv } from "../../config/env";
 
 /**
@@ -25,7 +25,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: AccessTokenPayload): AuthenticatedUser {
+  validate(payload: AuthJwtPayload): AuthenticatedUser {
+    // Previously this accepted ANY correctly-signed payload as valid
+    // Bearer auth — meaning a refresh token (or now, a pre-auth token)
+    // could be used interchangeably with a real access token against any
+    // route that doesn't separately check tenant/permission claims. Real
+    // gap, fixed here: only a genuine "access" token passes.
+    if (payload.tokenType !== "access") {
+      throw new UnauthorizedException("Invalid token type for this request.");
+    }
+
     // This object becomes req.user
     return payload;
   }

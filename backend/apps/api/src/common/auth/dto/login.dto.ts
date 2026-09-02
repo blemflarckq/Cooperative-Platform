@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import { IsEmail, IsString, MinLength, IsNotEmpty } from "class-validator";
+import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
 
 export class LoginDto {
   @IsNotEmpty()
@@ -10,11 +9,4 @@ export class LoginDto {
   @IsString()
   @MinLength(8)
   password!: string;
-
-  /**
-   * User picks which cooperative/tenant they are logging into.
-   */
-  @IsNotEmpty()
-  @IsString()
-  tenantSlug!: string;
 }
