@@ -8,6 +8,7 @@ import { JwtStrategy } from "./auth/jwt.strategy";
 import { AuditLog } from "./audit/audit-log.entity";
 //import { AuditInterceptor } from "./audit/audit.interceptor";
 import { IdentityModule } from "../modules/identity/identity.module";
+import { AccountingModule } from "../modules/accounting/accounting.module";
 import { getRequiredEnv } from "../config/env";
 
 /**
@@ -21,6 +22,7 @@ import { getRequiredEnv } from "../config/env";
 @Module({
   imports: [
     IdentityModule,
+    AccountingModule,
     TypeOrmModule.forFeature([AuditLog]),
     JwtModule.register({
       secret: getRequiredEnv("JWT_ACCESS_SECRET"),

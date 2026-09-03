@@ -1,0 +1,14 @@
+What's explicitly parked, by decision
+    - Mobile money integration — waiting on you and the providers, correctly not our problem to solve yet.
+    - Aggregate insights — correctly post-pilot by design.
+What's real, not started
+    - Notifications — the pipeline works (we fixed it back in Phase 1), but nothing actually sends an SMS/email yet.
+    - Audit log visibility — the data's being recorded; there's no screen to look at it.
+    - Rate escalation isn't scheduled — the endpoint works, but nothing calls it automatically once a month yet.
+    - Pilot readiness — onboarding your real cooperative's data, a support plan, defined success metrics — none of this started.
+
+1/9/2026
+Parked loan context details and interesting views. This was the prompt for reference:
+Brilliant all good. Now  2 more things, in the Loans, it would be better for the view to have my loans in one segment,  perhaps sorted by loan dates, then when you get into the details of the loan you then see in addition to the sources of funds, the dates and times of the different activities of the loan and the respective actors. this would be much more informative for the user. perhaps also something of a lag metric showing the total time from disbursement to full repayment, and other metrics such as the active interest if still outstanding and the risk status, also when the next  interest bracket will kick in (date or days, maybe both?). Then another segment for other members loans with the same detail. Thinking about this as I write it would also be useful to have the ability to search by dates, member status and so on. or is this perhaps a stand alone loans report/dashboard view? perhaps the current loan view is just an operations aid where the loans lifecycle lives?
+
+Please synthesize the paragraph above and come up with a fuller impactful professional suggestion as I kept getting ideas as I typed, but the idea is that members are also accountable to each other so it is important that the platform is able to narrate the entire story of a loan, of course in an appealing intuitive manner for the layman.

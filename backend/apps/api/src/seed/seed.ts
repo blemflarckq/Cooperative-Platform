@@ -5,7 +5,6 @@ import { AppDataSource } from "../config/typeorm.datasource";
 import { seedTenants } from "./tenants.seed";
 import { seedRoles } from "./roles.seed";
 import { seedPermissions } from "./permissions.seed";
-import { seedRolePermissions } from "./role-permissions.seed";
 
 async function bootstrap() {
   // Use createApplicationContext for a headless "CLI" app (no HTTP listener)
@@ -18,8 +17,10 @@ async function bootstrap() {
     console.log('🌱 Starting Seeding process...');
     await seedTenants(AppDataSource);
     await seedPermissions(AppDataSource);
+    // seedRoles now also grants each role's permissions (via the shared
+    // bootstrapRolesForTenant) — role-permissions.seed.ts's separate step
+    // was fully redundant once that changed, so it's been removed.
     await seedRoles(AppDataSource);
-    await seedRolePermissions(AppDataSource);
     await seeder.run();
     console.log('✅ Seeding completed successfully.');
   } catch (error) {

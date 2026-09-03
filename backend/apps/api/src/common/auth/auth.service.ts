@@ -7,13 +7,17 @@ import {
 } from "@nestjs/common";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
 
 import { verifyPassword } from "./password";
 import { User } from "../../modules/identity/entities/user.entity";
 import { Tenant } from "../../modules/identity/entities/tenant.entity";
 import { TenantUser } from "../../modules/identity/entities/tenant-user.entity";
 import { TenantUserRole } from "../../modules/identity/entities/tenant-user-role.entity";
+import { Role } from "../../modules/identity/entities/role.entity";
+import { bootstrapRolesForTenant } from "../../modules/identity/services/tenant-role-bootstrap";
+import { AccountingSettingsService } from "../../modules/accounting/services/accounting-settings.service";
+import { slugifyCode } from "../utils/code-generator";
 import { hashPassword } from "../../common/auth/password";
 import { getRequiredEnv } from "../../config/env";
 import type { AuthJwtPayload } from "./jwt.types";
@@ -69,6 +73,8 @@ const PRE_AUTH_TOKEN_TTL = "5m";
 export class AuthService {
   constructor(
     private readonly jwt: JwtService,
+    private readonly dataSource: DataSource,
+    private readonly accountingSettingsService: AccountingSettingsService,
 
     @InjectRepository(User)
     private readonly users: Repository<User>,
@@ -193,6 +199,114 @@ export class AuthService {
     }
 
     return this.buildLoginResponse(user, membership.tenant);
+  }
+
+  /**
+   * Setup, step one — "create your cooperative." Everything that must be
+   * atomic (tenant, its roles, the founder's membership and admin role,
+   * the chart of accounts) happens in one transaction; the session is
+   * issued via the existing buildLoginResponse only after that commits,
+   * so it's reading genuinely-committed data rather than rows a
+   * non-transactional repository might not yet see inside an open
+   * transaction.
+   */
+  async createTenant(preAuthToken: string, name: string): Promise<LoginResponse> {
+    let payload: AuthJwtPayload;
+
+    try {
+      payload = await this.jwt.verifyAsync<AuthJwtPayload>(preAuthToken, {
+        secret: getRequiredEnv("JWT_ACCESS_SECRET"),
+      });
+    } catch {
+      throw new UnauthorizedException("Invalid or expired session — please log in again.");
+    }
+
+    if (payload.tokenType !== "pre_auth") {
+      throw new UnauthorizedException("Invalid token for creating a cooperative.");
+    }
+
+    const user = await this.users.findOne({
+      where: { id: payload.sub, isActive: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("User account is inactive or no longer exists.");
+    }
+
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      throw new ForbiddenException("A cooperative name is required.");
+    }
+
+    const savedTenant = await this.dataSource.transaction(async (manager) => {
+      const slug = await this.generateUniqueSlug(manager, trimmedName);
+
+      const tenant = manager.create(Tenant, {
+        name: trimmedName,
+        slug,
+        isActive: true,
+      });
+      const tenant_ = await manager.save(Tenant, tenant);
+
+      // Same shared bootstrap the seed script uses for every tenant —
+      // one definition, not a second copy invented here.
+      await bootstrapRolesForTenant(manager, tenant_.id);
+
+      const tenantUser = manager.create(TenantUser, {
+        tenantId: tenant_.id,
+        userId: user.id,
+        isActive: true,
+      });
+      const savedTenantUser = await manager.save(TenantUser, tenantUser);
+
+      const adminRole = await manager.findOne(Role, {
+        where: { tenantId: tenant_.id, code: "tenant_admin" },
+      });
+
+      if (!adminRole) {
+        // Would mean bootstrapRolesForTenant silently failed to create
+        // the one role every tenant must have — a real bug, not a user
+        // error, so this is deliberately an unrecoverable failure rather
+        // than something to degrade gracefully from.
+        throw new Error("tenant_admin role missing immediately after bootstrap.");
+      }
+
+      const roleAssignment = manager.create(TenantUserRole, {
+        tenantUserId: savedTenantUser.id,
+        roleId: adminRole.id,
+      });
+      await manager.save(TenantUserRole, roleAssignment);
+
+      // The chart of accounts every tenant needs to record real money —
+      // invisible to whoever's setting this up, exactly as intended.
+      await this.accountingSettingsService.provisionDefaults(
+        tenant_.id,
+        user.id,
+        "Cash at Bank",
+        manager,
+      );
+
+      return tenant_;
+    });
+
+    return this.buildLoginResponse(user, savedTenant);
+  }
+
+  private async generateUniqueSlug(
+    manager: EntityManager,
+    name: string,
+  ): Promise<string> {
+    const base = slugifyCode(name) || "cooperative";
+    let candidate = base;
+    let suffix = 1;
+
+    while (await manager.findOne(Tenant, { where: { slug: candidate } })) {
+      suffix += 1;
+      candidate = `${base}-${suffix}`;
+    }
+
+    return candidate;
   }
 
   async refresh(refreshToken: string): Promise<LoginResponse> {

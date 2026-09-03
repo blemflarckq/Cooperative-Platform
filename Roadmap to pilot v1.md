@@ -392,6 +392,45 @@ of the group.
 
 ---
 
+## 📌 PINNED — Member equity / share capital accounting (not scoped, needs real expertise)
+
+**Genuinely different in kind from the other pins in this document** — the
+others were parked for lack of time or a provider dependency; this one is
+parked because it can't be responsibly scoped without real subject-matter
+input, and shouldn't be guessed at.
+
+**The gap, precisely:** every contribution a member makes is currently
+modeled as a *liability* — money the cooperative owes back to them. That's
+correct for a mutual savings society. It is **not** fully correct for a
+formal, registered cooperative's *share capital*, which is conventionally
+*equity* — an ownership stake, typically with different rules from ordinary
+savings: dividends instead of interest, often not freely withdrawable,
+governed by the applicable Cooperative Societies Act (or equivalent) rather
+than just internal policy.
+
+**Why this is explicitly flagged as needing outside input, not just
+engineering time:** neither the founder nor Claude has the specialized
+cooperative-accounting or regulatory background to define this correctly.
+Guessing at the rules risks producing financial statements that are
+confidently wrong for a real organization — a materially worse failure mode
+than most product gaps, since it could mislead members, auditors, or
+regulators rather than just being an unfinished feature.
+
+**What would actually unblock this:** a conversation with an accountant or
+auditor experienced in cooperative societies accounting in the target
+jurisdiction (Lesotho, and likely worth checking how portable the answer is
+beyond it), and a look at how the local Cooperative Societies Act (or
+equivalent) actually requires share capital and member equity to be
+reported. Possibly also worth a quick look at how existing SACCO/cooperative
+accounting software elsewhere models this, as a sanity check rather than a
+template to copy blind.
+
+**Trigger to revisit:** as soon as that subject-matter conversation is
+possible — this one shouldn't wait for a "phase" to come around on its own,
+since the blocker is expertise, not sequencing.
+
+---
+
 ## Phase 7 — Pilot Readiness (1–2 weeks)
 
 - Onboard the real pilot cooperative's data (members, opening balances,

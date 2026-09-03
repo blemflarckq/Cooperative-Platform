@@ -20,6 +20,11 @@ const DEFAULT_TENANTS: Array<{
     slug: process.env.SEED_TENANT_SLUG ?? 'demo-coop',
     isActive: true,
   },
+  {
+    name: process.env.SEED_TENANT_NAME_1 ?? 'Demo Cooperative',
+    slug: process.env.SEED_TENANT_SLUG_1 ?? 'demo-coop',
+    isActive: true,
+  },
 ];
 
 /**

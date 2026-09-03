@@ -3,6 +3,7 @@ import { type Response } from 'express';
 import { AuthService, AuthResult, LoginResponse } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { SelectTenantDto } from "./dto/select-tenant.dto";
+import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { Public } from "./public.decorator";
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -38,6 +39,17 @@ export class AuthController {
   @Post("select-tenant")
   async selectTenant(@Body() dto: SelectTenantDto): Promise<LoginResponse> {
     return this.auth.selectTenant(dto.preAuthToken, dto.tenantId);
+  }
+
+  /**
+   * Setup, step one — exchanges a pre-auth token (no tenant yet) plus a
+   * chosen name for a brand new tenant, landing the caller inside it as
+   * its admin.
+   */
+  @Public()
+  @Post("create-tenant")
+  async createTenant(@Body() dto: CreateTenantDto): Promise<LoginResponse> {
+    return this.auth.createTenant(dto.preAuthToken, dto.name);
   }
 
   @Public()

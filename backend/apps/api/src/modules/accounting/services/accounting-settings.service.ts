@@ -285,8 +285,9 @@ export class AccountingSettingsService {
     tenantId: string,
     actorUserId?: string,
     cashAccountName = "Cash at Bank",
+    existingManager?: EntityManager,
     ): Promise<AccountingSettings> {
-    return this.dataSource.transaction(async (manager) => {
+    const run = async (manager: EntityManager): Promise<AccountingSettings> => {
         const settings = await this.getOrCreateWithManager(manager, tenantId);
 
         const cash = await this.getOrCreateSystemAccount(manager, tenantId, {
@@ -383,7 +384,13 @@ export class AccountingSettingsService {
         });
 
         return this.findOneOrFail(manager, tenantId);
-    });
+    };
+
+    if (existingManager) {
+      return run(existingManager);
+    }
+
+    return this.dataSource.transaction(run);
     }
 
   

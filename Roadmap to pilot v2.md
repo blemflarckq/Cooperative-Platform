@@ -257,6 +257,38 @@ parallel once the provider groundwork exists for either.
 
 ---
 
+## 📌 PINNED — Native email verification (parked, lighter than SMS but same category)
+
+**Deliberately kept separate from the phone-auth pin above, even though
+both are "verification of who someone is" — the blockers are genuinely
+different in kind.** Registration (email + password, no verification
+yet) and OAuth sign-in (Google/Facebook — verified by the provider
+itself) are both live. What's parked is specifically *confirming a
+plain email+password account's email address is real*.
+
+**What it would actually take:** an email-sending provider (SendGrid,
+AWS SES, Resend — free tiers exist, so not a cost blocker the way SMS
+is), a real domain with SPF/DKIM/DMARC DNS records configured for it
+(without this, verification emails land in spam or get rejected by
+Gmail/Yahoo outright — this is the part that takes real setup time, not
+the sending), plus backend work: a verification token, a confirm
+endpoint, an `isEmailVerified` field, a resend flow, and a real decision
+on whether unverified accounts get blocked or just nudged.
+
+**Why it's genuinely lower priority than it might look:** OAuth sign-in
+already provides verified identity for anyone who uses it — Google and
+Facebook confirm the email on their end. Native verification only
+matters for the plain email+password path specifically, which is why
+leaving it unverified-but-functional for now is a reasonable stance, not
+a security gap being ignored.
+
+**Trigger to revisit:** once a domain and DNS are being set up for other
+reasons anyway (branding, the eventual production deployment), or if
+plain email+password registration volume becomes large enough that
+unverified accounts become a real operational concern.
+
+---
+
 ## Phase 4 — Make Notifications Real (1 week)
 
 Right now events are written but nothing's listening. This phase adds a
@@ -389,6 +421,45 @@ the product expression of the brand strategy:**
 you their balance and next loan payment just by looking at the screen — *and*
 can point to something on the screen that makes them feel proud to be part
 of the group.
+
+---
+
+## 📌 PINNED — Member equity / share capital accounting (not scoped, needs real expertise)
+
+**Genuinely different in kind from the other pins in this document** — the
+others were parked for lack of time or a provider dependency; this one is
+parked because it can't be responsibly scoped without real subject-matter
+input, and shouldn't be guessed at.
+
+**The gap, precisely:** every contribution a member makes is currently
+modeled as a *liability* — money the cooperative owes back to them. That's
+correct for a mutual savings society. It is **not** fully correct for a
+formal, registered cooperative's *share capital*, which is conventionally
+*equity* — an ownership stake, typically with different rules from ordinary
+savings: dividends instead of interest, often not freely withdrawable,
+governed by the applicable Cooperative Societies Act (or equivalent) rather
+than just internal policy.
+
+**Why this is explicitly flagged as needing outside input, not just
+engineering time:** neither the founder nor Claude has the specialized
+cooperative-accounting or regulatory background to define this correctly.
+Guessing at the rules risks producing financial statements that are
+confidently wrong for a real organization — a materially worse failure mode
+than most product gaps, since it could mislead members, auditors, or
+regulators rather than just being an unfinished feature.
+
+**What would actually unblock this:** a conversation with an accountant or
+auditor experienced in cooperative societies accounting in the target
+jurisdiction (Lesotho, and likely worth checking how portable the answer is
+beyond it), and a look at how the local Cooperative Societies Act (or
+equivalent) actually requires share capital and member equity to be
+reported. Possibly also worth a quick look at how existing SACCO/cooperative
+accounting software elsewhere models this, as a sanity check rather than a
+template to copy blind.
+
+**Trigger to revisit:** as soon as that subject-matter conversation is
+possible — this one shouldn't wait for a "phase" to come around on its own,
+since the blocker is expertise, not sequencing.
 
 ---
 
