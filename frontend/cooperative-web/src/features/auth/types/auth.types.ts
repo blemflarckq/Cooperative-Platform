@@ -21,6 +21,27 @@ export interface LoginResponse {
   user: AuthenticatedUserResponse;
 }
 
+export interface TenantOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export type AuthResult =
+  | ({ status: "authenticated" } & LoginResponse)
+  | { status: "select_tenant"; preAuthToken: string; tenants: TenantOption[] }
+  | { status: "no_tenant"; preAuthToken: string };
+
+export interface SelectTenantRequest {
+  preAuthToken: string;
+  tenantId: string;
+}
+
+export interface CreateTenantRequest {
+  preAuthToken: string;
+  name: string;
+}
+
 export interface AcceptInvitationRequest {
   token: string;
   password: string;
@@ -47,5 +68,5 @@ export interface RefreshTokenRequest {
 
 export interface RefreshTokenResponse {
   accessToken: string;
-  refreshToken?: string;
+  refreshToken: string;
 }

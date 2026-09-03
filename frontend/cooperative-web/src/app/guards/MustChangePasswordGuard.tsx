@@ -1,12 +1,11 @@
-import { Navigate, Outlet, useParams } from "react-router";
+import { Navigate, Outlet } from "react-router";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 export function MustChangePasswordGuard() {
   const { user } = useAuth();
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
 
   if (user?.mustChangePassword) {
-    return <Navigate to={`/${tenantSlug}/change-password`} replace />;
+    return <Navigate to="/app/change-password" replace />;
   }
 
   return <Outlet />;

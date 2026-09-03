@@ -41,10 +41,9 @@ export function AcceptInvitationPage() {
 
   const mutation = useMutation({
     mutationFn: acceptInvitation,
-    onSuccess: (response) => {
-      localStorage.setItem("last_tenant_slug", response.tenantSlug);
+    onSuccess: () => {
       toast.success("Invitation accepted. You can now sign in.");
-      navigate(`/${response.tenantSlug}/login`, { replace: true });
+      navigate("/login", { replace: true });
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error));

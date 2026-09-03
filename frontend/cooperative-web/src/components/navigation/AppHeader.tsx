@@ -22,10 +22,9 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
   const queryClient = useQueryClient();
 
   function handleLogout() {
-    const slug = localStorage.getItem('last_tenant_slug');
     logout();
     queryClient.clear();
-    navigate(`/${slug}/login`, { replace: true });
+    navigate("/login", { replace: true });
   }
 
   return (

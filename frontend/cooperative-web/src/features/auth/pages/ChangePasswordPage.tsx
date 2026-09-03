@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { changePassword } from "@/features/auth/api/auth.api";
 import { getApiErrorMessage } from "@/lib/api/api-error";
@@ -27,7 +27,6 @@ type FormValues = z.infer<typeof schema>;
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const { user, login, token } = useAuth();
 
   const form = useForm<FormValues>({
@@ -59,7 +58,7 @@ export function ChangePasswordPage() {
       }
 
       toast.success("Password changed successfully");
-      navigate(`/${tenantSlug}/app/dashboard`, { replace: true });
+      navigate("/app/dashboard", { replace: true });
     },
     onError: (error) => {
       toast.error(getApiErrorMessage(error));

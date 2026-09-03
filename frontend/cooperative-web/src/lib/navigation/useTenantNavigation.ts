@@ -1,24 +1,15 @@
-import { useNavigate, useParams } from "react-router";
-import { buildTenantAppPath, buildTenantLoginPath } from "./tenant-routes";
+import { useNavigate } from "react-router";
+import { buildAppPath, buildLoginPath } from "./tenant-routes";
 
 export function useTenantNavigation() {
   const navigate = useNavigate();
-  const { tenantSlug } = useParams<{ tenantSlug: string }>();
-
-  function requireTenantSlug() {
-    if (!tenantSlug) {
-      throw new Error("Missing tenantSlug in route params");
-    }
-
-    return tenantSlug;
-  }
 
   function appPath(path: string) {
-    return buildTenantAppPath(requireTenantSlug(), path);
+    return buildAppPath(path);
   }
 
   function loginPath() {
-    return buildTenantLoginPath(requireTenantSlug());
+    return buildLoginPath();
   }
 
   function navigateToApp(path: string, options?: { replace?: boolean }) {
@@ -30,7 +21,6 @@ export function useTenantNavigation() {
   }
 
   return {
-    tenantSlug: requireTenantSlug(),
     appPath,
     loginPath,
     navigateToApp,

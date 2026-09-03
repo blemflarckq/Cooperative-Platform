@@ -5,6 +5,9 @@ import type {
     ChangePasswordRequest,
     ChangePasswordResponse,
     LoginRequest,
+    AuthResult,
+    SelectTenantRequest,
+    CreateTenantRequest,
     LoginResponse,
     AuthenticatedUserResponse,
     RefreshTokenRequest,
@@ -13,8 +16,22 @@ import type {
 
 export async function loginRequest(
   payload: LoginRequest,
+): Promise<AuthResult> {
+  const response = await apiClient.post<AuthResult>("/auth/login", payload);
+  return response.data;
+}
+
+export async function selectTenantRequest(
+  payload: SelectTenantRequest,
 ): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>("/auth/login", payload);
+  const response = await apiClient.post<LoginResponse>("/auth/select-tenant", payload);
+  return response.data;
+}
+
+export async function createTenantRequest(
+  payload: CreateTenantRequest,
+): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>("/auth/create-tenant", payload);
   return response.data;
 }
 
@@ -26,9 +43,7 @@ export async function acceptInvitation(
     payload,
   );
 
-  console.log(response.data)
   return response.data;
-  
 }
 
 export async function changePassword(

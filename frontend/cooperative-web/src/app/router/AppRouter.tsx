@@ -1,9 +1,11 @@
-import { Routes, Route, Navigate/*, useParams*/ } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import { AuthGuard } from "@/app/guards/AuthGuard";
 import { MustChangePasswordGuard } from "@/app/guards/MustChangePasswordGuard";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { AppShellLayout } from "@/app/layouts/AppShellLayout";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
+import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
+import { SetupSchemePage } from "@/features/setup/pages/SetupSchemePage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { TenantUsersPage } from "@/features/tenant-users/pages/TenantUsersPage";
 import { CreateTenantUserPage } from "@/features/tenant-users/pages/CreateTenantUserPage";
@@ -57,21 +59,12 @@ import { SavingsReportsPage } from "@/features/reports/pages/SavingsReportsPage"
  */
 
 function RootRedirector() {
-  const lastSlug = localStorage.getItem("last_tenant_slug");
-
-  // 1. If we know their slug, send them to their specific login
-  if (lastSlug) {
-    return <Navigate to={`/${lastSlug}/login`} replace />;
-  }
-
-  // 2. If we don't know who they are, send them to a landing page 
-  // or a general login if you have one.
-  return <Navigate to="/login" replace />; 
+  // Tenant is resolved from the authenticated session now, not
+  // remembered per-slug — there's just the one universal login.
+  return <Navigate to="/login" replace />;
 }
 
 function AppIndexRedirect() {
-  // /const { tenantSlug } = useParams();
-  //return <Navigate to={`/${tenantSlug}/app/dashboard`} replace />;
   return <Navigate to="dashboard" replace />;
 }
 
@@ -79,13 +72,15 @@ export function AppRouter() {
   return (
     <Routes>
       <Route element={<AuthLayout />}>
-        <Route path="/:tenantSlug/login" element={<LoginPage />} />
-        <Route path="/:tenantSlug/accept-invitation" element={<AcceptInvitationPage />} />
-        <Route path="/:tenantSlug/reset-password" element={<ResetPasswordPlaceholderPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/create-tenant" element={<CreateTenantPage />} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPlaceholderPage />} />
       </Route>
 
       <Route element={<AuthGuard />}>
-        <Route path="/:tenantSlug/app" element={<AppShellLayout />}>
+        <Route path="/app" element={<AppShellLayout />}>
+          <Route path="setup/scheme" element={<SetupSchemePage />} />
           <Route path="change-password" element={<ChangePasswordPage />} />
           <Route element={<MustChangePasswordGuard />}>
             <Route index element={<AppIndexRedirect />} />
