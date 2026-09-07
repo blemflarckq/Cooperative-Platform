@@ -5,6 +5,7 @@ import type {
     ChangePasswordRequest,
     ChangePasswordResponse,
     LoginRequest,
+    RegisterRequest,
     AuthResult,
     SelectTenantRequest,
     CreateTenantRequest,
@@ -18,6 +19,13 @@ export async function loginRequest(
   payload: LoginRequest,
 ): Promise<AuthResult> {
   const response = await apiClient.post<AuthResult>("/auth/login", payload);
+  return response.data;
+}
+
+export async function registerRequest(
+  payload: RegisterRequest,
+): Promise<AuthResult> {
+  const response = await apiClient.post<AuthResult>("/auth/register", payload);
   return response.data;
 }
 

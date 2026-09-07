@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
@@ -92,6 +93,51 @@ export class AuthService {
   async login(params: { email: string; password: string }): Promise<AuthResult> {
     const user = await this.verifyIdentity(params.email, params.password);
     return this.resolveTenantsAndIssueSession(user);
+  }
+
+  /**
+   * The piece that was genuinely missing before this — a brand-new
+   * person, never touched the platform, has nowhere to create an
+   * account at all. This is that missing first step. Deliberately
+   * unverified for now (see the roadmap pin on native email
+   * verification) — creates the account and immediately proceeds
+   * through the exact same tenant-resolution path login uses, which for
+   * a new person always resolves to "no_tenant" and routes into Setup.
+   */
+  async register(params: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobile: string;
+    password: string;
+  }): Promise<AuthResult> {
+    const normalizedEmail = params.email.trim().toLowerCase();
+
+    const existing = await this.users.findOne({
+      where: { email: normalizedEmail },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        "An account with this email already exists — try signing in instead.",
+      );
+    }
+
+    const passwordHash = await hashPassword(params.password);
+
+    const user = this.users.create({
+      firstName: params.firstName.trim(),
+      lastName: params.lastName.trim(),
+      email: normalizedEmail,
+      mobile: params.mobile.trim(),
+      passwordHash,
+      mustChangePassword: false,
+      isActive: true,
+    });
+
+    const savedUser = await this.users.save(user);
+
+    return this.resolveTenantsAndIssueSession(savedUser);
   }
 
   /**

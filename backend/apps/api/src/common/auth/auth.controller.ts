@@ -2,6 +2,7 @@ import { Body, Controller, Post, Get, Headers, Res, HttpStatus } from "@nestjs/c
 import { type Response } from 'express';
 import { AuthService, AuthResult, LoginResponse } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
 import { SelectTenantDto } from "./dto/select-tenant.dto";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { Public } from "./public.decorator";
@@ -29,6 +30,12 @@ export class AuthController {
   @Post("login")
   async login(@Body() dto: LoginDto): Promise<AuthResult> {
     return this.auth.login(dto);
+  }
+
+  @Public()
+  @Post("register")
+  async register(@Body() dto: RegisterDto): Promise<AuthResult> {
+    return this.auth.register(dto);
   }
 
   /**
