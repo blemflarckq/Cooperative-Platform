@@ -4,8 +4,9 @@ import { MustChangePasswordGuard } from "@/app/guards/MustChangePasswordGuard";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { AppShellLayout } from "@/app/layouts/AppShellLayout";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
-import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { OAuthCallbackPage } from "@/features/auth/pages/OAuthCallbackPage";
+import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
 import { SetupSchemePage } from "@/features/setup/pages/SetupSchemePage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { TenantUsersPage } from "@/features/tenant-users/pages/TenantUsersPage";
@@ -75,6 +76,7 @@ export function AppRouter() {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/create-tenant" element={<CreateTenantPage />} />
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/reset-password" element={<ResetPasswordPlaceholderPage />} />

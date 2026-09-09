@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/api/api-error";
 import { useRegister } from "@/features/auth/hooks/useRegister";
 import { useAuthResultHandler } from "@/features/auth/hooks/useAuthResultHandler";
 import { TenantPicker } from "@/features/auth/components/TenantPicker";
+import { OAuthButtons } from "@/features/auth/components/OAuthButtons";
 
 const registerSchema = z.object({
   firstName: z.string().min(1, "Required"),
@@ -69,7 +70,15 @@ export function RegisterPage() {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
+        <OAuthButtons />
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-(--border)" />
+          <span className="text-xs text-(--muted-foreground)">or</span>
+          <div className="h-px flex-1 bg-(--border)" />
+        </div>
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

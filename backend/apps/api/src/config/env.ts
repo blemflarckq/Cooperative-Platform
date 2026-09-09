@@ -18,3 +18,16 @@ export function getRequiredEnv(name: string): string {
 
   return value;
 }
+
+/**
+ * For config that's genuinely optional at the app level — OAuth
+ * credentials being the case that motivated this. The app must still
+ * boot and serve email+password login/Setup even when nobody has
+ * configured Google/Facebook OAuth yet; only actually hitting those
+ * specific routes without real credentials should fail, not starting
+ * the whole server.
+ */
+export function getOptionalEnv(name: string, fallback = ""): string {
+  const value = process.env[name];
+  return value && value.trim().length > 0 ? value : fallback;
+}

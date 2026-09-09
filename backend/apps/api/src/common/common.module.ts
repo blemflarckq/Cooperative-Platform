@@ -4,6 +4,8 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { JwtStrategy } from "./auth/jwt.strategy";
+import { GoogleStrategy } from "./auth/google.strategy";
+import { FacebookStrategy } from "./auth/facebook.strategy";
 //import { TenantContextService } from "./tenancy/tenant-context.service";
 import { AuditLog } from "./audit/audit-log.entity";
 //import { AuditInterceptor } from "./audit/audit.interceptor";
@@ -30,7 +32,7 @@ import { getRequiredEnv } from "../config/env";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy/*, TenantContextService*/],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, FacebookStrategy],
   exports: [JwtModule/*, TenantContextService*/,TypeOrmModule],
 })
 export class CommonModule {}

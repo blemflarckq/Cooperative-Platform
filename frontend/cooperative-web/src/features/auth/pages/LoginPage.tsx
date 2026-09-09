@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/api/api-error";
 import { useLogin } from "@/features/auth/hooks/useLogin";
 import { useAuthResultHandler } from "@/features/auth/hooks/useAuthResultHandler";
 import { TenantPicker } from "@/features/auth/components/TenantPicker";
+import { OAuthButtons } from "@/features/auth/components/OAuthButtons";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address"),
@@ -66,7 +67,15 @@ export function LoginPage() {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
+        <OAuthButtons />
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-(--border)" />
+          <span className="text-xs text-(--muted-foreground)">or</span>
+          <div className="h-px flex-1 bg-(--border)" />
+        </div>
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Email</label>

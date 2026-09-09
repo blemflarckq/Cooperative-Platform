@@ -95,15 +95,6 @@ export class AuthService {
     return this.resolveTenantsAndIssueSession(user);
   }
 
-  /**
-   * The piece that was genuinely missing before this — a brand-new
-   * person, never touched the platform, has nowhere to create an
-   * account at all. This is that missing first step. Deliberately
-   * unverified for now (see the roadmap pin on native email
-   * verification) — creates the account and immediately proceeds
-   * through the exact same tenant-resolution path login uses, which for
-   * a new person always resolves to "no_tenant" and routes into Setup.
-   */
   async register(params: {
     firstName: string;
     lastName: string;
@@ -205,6 +196,79 @@ export class AuthService {
         slug: membership.tenant.slug,
       })),
     };
+  }
+
+  /**
+   * Find-or-create by email — if this person already registered with
+   * email+password (or signed in via the other OAuth provider) using the
+   * same email, this is the same account, not a new one. Google and
+   * Facebook both confirm the email is real, so this path is one of the
+   * few that can trust it without our own verification step.
+   */
+  async resolveOAuthLogin(profile: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<AuthResult> {
+    const normalizedEmail = profile.email.trim().toLowerCase();
+
+    let user = await this.users.findOne({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      const created = this.users.create({
+        firstName: profile.firstName,
+        lastName: profile.lastName || "Member",
+        email: normalizedEmail,
+        mobile: null,
+        passwordHash: null,
+        mustChangePassword: false,
+        isActive: true,
+      });
+      user = await this.users.save(created);
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException("This account is inactive.");
+    }
+
+    return this.resolveTenantsAndIssueSession(user);
+  }
+
+  /**
+   * The OAuth callback computes a full AuthResult server-side, then
+   * needs to hand it to the frontend across a browser redirect. Putting
+   * real access/refresh tokens directly in a redirect URL would leave
+   * them sitting in browser history and any server access logs along
+   * the way — instead, the whole result is embedded in a short-lived,
+   * single-purpose token, and the frontend exchanges that code for the
+   * real result via a normal POST body, never a URL.
+   */
+  async issueOAuthResultCode(result: AuthResult): Promise<string> {
+    const payload: AuthJwtPayload = {
+      sub: "oauth",
+      tokenType: "oauth_result",
+      oauthResult: result,
+    };
+
+    return this.jwt.signAsync(payload, { expiresIn: "60s" });
+  }
+
+  async completeOAuth(code: string): Promise<AuthResult> {
+    let payload: AuthJwtPayload;
+
+    try {
+      payload = await this.jwt.verifyAsync<AuthJwtPayload>(code, {
+        secret: getRequiredEnv("JWT_ACCESS_SECRET"),
+      });
+    } catch {
+      throw new UnauthorizedException("This sign-in link has expired — please try again.");
+    }
+
+    if (payload.tokenType !== "oauth_result" || !payload.oauthResult) {
+      throw new UnauthorizedException("Invalid sign-in code.");
+    }
+
+    return payload.oauthResult as AuthResult;
   }
 
   /**

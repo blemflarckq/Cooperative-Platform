@@ -3,17 +3,11 @@ import { useNavigate, useLocation } from "react-router";
 import { toast } from "sonner";
 
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getApiErrorMessage } from "@/lib/api/api-error";
 import { mapAuthenticatedUser } from "@/features/auth/api/auth.mapper";
 import { useSelectTenant } from "@/features/auth/hooks/useSelectTenant";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 import type { AuthResult, TenantOption } from "@/features/auth/types/auth.types";
 
-/**
- * Shared by LoginPage and RegisterPage — both produce the same
- * AuthResult shape and need to branch on it identically (straight in,
- * pick a tenant, or route into Setup). One definition, not two copies
- * that could drift.
- */
 export function useAuthResultHandler() {
   const navigate = useNavigate();
   const location = useLocation();

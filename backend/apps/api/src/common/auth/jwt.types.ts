@@ -6,7 +6,7 @@
  * check it). Unified into one type, imported everywhere a payload is
  * signed or validated.
  */
-export type TokenType = "access" | "refresh" | "pre_auth";
+export type TokenType = "access" | "refresh" | "pre_auth" | "oauth_result";
 
 export interface AuthJwtPayload {
   sub: string;
@@ -21,6 +21,13 @@ export interface AuthJwtPayload {
   tenantSlug?: string;
   roles?: string[];
   permissions?: string[];
+  /**
+   * Only present on "oauth_result" tokens — the whole AuthResult the
+   * OAuth callback computed, carried across the browser redirect from
+   * backend to frontend as a short-lived, single-purpose code rather
+   * than putting real access/refresh tokens directly in a URL.
+   */
+  oauthResult?: unknown;
   iat?: number;
   exp?: number;
 }

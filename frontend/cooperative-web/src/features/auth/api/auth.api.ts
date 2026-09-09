@@ -29,6 +29,11 @@ export async function registerRequest(
   return response.data;
 }
 
+export async function oauthCompleteRequest(code: string): Promise<AuthResult> {
+  const response = await apiClient.post<AuthResult>("/auth/oauth-complete", { code });
+  return response.data;
+}
+
 export async function selectTenantRequest(
   payload: SelectTenantRequest,
 ): Promise<LoginResponse> {
