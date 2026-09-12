@@ -4,6 +4,7 @@ import { MustChangePasswordGuard } from "@/app/guards/MustChangePasswordGuard";
 import { AuthLayout } from "@/app/layouts/AuthLayout";
 import { AppShellLayout } from "@/app/layouts/AppShellLayout";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
+import { AddPhoneNumberPage } from "@/features/auth/pages/AddPhoneNumberPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { OAuthCallbackPage } from "@/features/auth/pages/OAuthCallbackPage";
 import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
@@ -83,6 +84,9 @@ export function AppRouter() {
       </Route>
 
       <Route element={<AuthGuard />}>
+        <Route element={<AuthLayout />}>
+          <Route path="/add-phone" element={<AddPhoneNumberPage />} />
+        </Route>
         <Route path="/app" element={<AppShellLayout />}>
           <Route path="setup/scheme" element={<SetupSchemePage />} />
           <Route path="change-password" element={<ChangePasswordPage />} />

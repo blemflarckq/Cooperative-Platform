@@ -85,3 +85,7 @@ export async function refreshTokenRequest(
 
   return response.data;
 }
+export async function setMobileRequest(mobile: string): Promise<{ mobile: string }> {
+  const response = await apiClient.post<{ mobile: string }>("/auth/set-mobile", { mobile });
+  return response.data;
+}

@@ -23,7 +23,7 @@ export class User extends BaseEntity {
   // at the DTO/form level (see register.dto.ts) — this column being
   // nullable doesn't relax that, it only accommodates the one signup
   // path that genuinely can't supply it.
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   mobile!: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

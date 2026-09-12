@@ -1,8 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
-// passport-facebook is a runtime dependency; its typings may be unavailable in
-// installations that do not include @types/passport-facebook.
-// @ts-expect-error -- use the package's runtime exports when typings are absent.
 import { Strategy, StrategyOptions, Profile } from "passport-facebook";
 import { getOptionalEnv } from "../../config/env";
 import type { OAuthProfileResult } from "./google.strategy";

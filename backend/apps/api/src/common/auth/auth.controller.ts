@@ -10,6 +10,7 @@ import { OAuthCompleteDto } from "./dto/oauth-complete.dto";
 import { Public } from "./public.decorator";
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { SetMobileDto } from './dto/set-mobile.dto';
 import { CurrentUser } from './current-user.decorator';
 import { TenantUserInvitationsService } from '../../modules/identity/services/tenant-user-invitations.service';
 import { TenantUsersService } from '../../modules/identity/services/tenant-users.service'
@@ -153,5 +154,21 @@ export class AuthController {
       currentPassword: dto.currentPassword,
       newPassword: dto.newPassword,
     });
+  }
+
+  /**
+   * Reached from the "add your phone number" gate — applies to anyone
+   * with a real session but no mobile on file, not just OAuth sign-ins.
+   * By the time this is reachable, a tenant always already exists in
+   * the person's session (single-tenant resolution, select-tenant, or
+   * create-tenant all produce a full session before this gate can
+   * trigger), so the usual tenant header is present as normal.
+   */
+  @Post('set-mobile')
+  async setMobile(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SetMobileDto,
+  ) {
+    return this.auth.setMobile(userId, dto.mobile);
   }
 }

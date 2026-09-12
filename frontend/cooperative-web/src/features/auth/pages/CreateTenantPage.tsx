@@ -6,29 +6,28 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth/AuthContext";
 import { getApiErrorMessage } from "@/lib/api/api-error";
-import { mapAuthenticatedUser } from "@/features/auth/api/auth.mapper";
 import { useCreateTenant } from "@/features/auth/hooks/useCreateTenant";
+import { useAuthResultHandler } from "@/features/auth/hooks/useAuthResultHandler";
 
 /**
  * Setup, step one. Reached only from LoginPage's "no_tenant" branch,
  * carrying the pre-auth token via route state — never asks for
- * credentials again. On success, lands fully authenticated as the new
- * tenant's admin and moves straight to step two (what's this for).
+ * credentials again. Routes its success through the same shared
+ * completeSession every other auth flow uses, rather than its own
+ * separate copy — this is specifically what makes the phone-number
+ * gate apply here too, not just to plain login/OAuth.
  */
 export function CreateTenantPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
   const createTenantMutation = useCreateTenant();
+  const { completeSession } = useAuthResultHandler();
 
   const preAuthToken = (location.state as { preAuthToken?: string } | null)?.preAuthToken;
   const [name, setName] = useState("");
 
   if (!preAuthToken) {
-    // Reached directly, not via login — no valid session to create
-    // against. Back to the start rather than a confusing dead end.
     navigate("/login", { replace: true });
     return null;
   }
@@ -41,14 +40,10 @@ export function CreateTenantPage() {
       { preAuthToken, name: trimmed },
       {
         onSuccess: (response) => {
-          const mappedUser = mapAuthenticatedUser(response.user);
-          login({
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken,
-            user: mappedUser,
+          completeSession(response, {
+            nextOverride: "/app/setup/scheme",
+            successMessage: `${trimmed} is set up`,
           });
-          toast.success(`${trimmed} is set up`);
-          navigate("/app/setup/scheme", { replace: true });
         },
         onError: (error) => toast.error(getApiErrorMessage(error)),
       },

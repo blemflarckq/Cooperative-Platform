@@ -7,6 +7,7 @@ export function mapAuthenticatedUser(response: AuthenticatedUserResponse): AuthU
     email: response.email,
     fullName:
       `${response.firstName ?? ""} ${response.lastName ?? ""}`.trim(),
+    mobile: response.mobile ?? null,
     tenantId: response.tenantId,
     tenantName: response.tenantName,
      roles: response.roles ?? [],

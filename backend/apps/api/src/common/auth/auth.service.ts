@@ -44,6 +44,7 @@ export interface AuthenticatedTenantUserResponse {
   email: string;
   firstName: string;
   lastName: string;
+  mobile: string | null;
   tenantId: string;
   tenantName: string;
   roles: string[];
@@ -493,6 +494,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        mobile: user.mobile,
         tenantId: tenant.id,
         tenantName: tenant.name ?? tenant.slug,
         roles,
@@ -689,5 +691,27 @@ export class AuthService {
     await this.users.save(user);
 
     return { success: true };
+  }
+
+  /**
+   * Fills in the one thing OAuth sign-in can't reliably provide, and
+   * which the platform genuinely depends on for its mobile-money
+   * integration — not a "maybe later" field. Applies to anyone missing
+   * a phone number, not just OAuth accounts specifically; the frontend
+   * gate that leads here checks generally, on purpose.
+   */
+  async setMobile(userId: string, mobile: string): Promise<{ mobile: string }> {
+    const user = await this.users.findOne({
+      where: { id: userId, isActive: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Invalid user.");
+    }
+
+    user.mobile = mobile.trim();
+    await this.users.save(user);
+
+    return { mobile: user.mobile };
   }
 }

@@ -41,7 +41,7 @@ export function OAuthCallbackPage() {
     }
 
     oauthComplete.mutate(code, {
-      onSuccess: handleAuthResult,
+      onSuccess: (result) => handleAuthResult(result),
       onError: (error) => {
         toast.error(getApiErrorMessage(error));
         navigate("/login", { replace: true });

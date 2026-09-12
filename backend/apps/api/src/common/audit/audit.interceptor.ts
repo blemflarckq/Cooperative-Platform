@@ -34,28 +34,29 @@ export class AuditInterceptor implements NestInterceptor {
     const res = http.getResponse();
 
     const isMutating = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
-    // 2. Skip if it's the login route (No user/tenant context exists yet)
-    const isLogin = req.url.includes('/auth/login') || req.url.includes('accept-invitation') || req.url.includes('/auth/refresh'); 
-    if (!isMutating || isLogin) return next.handle();    
+
+    // Previously this checked req.url against a hardcoded list of
+    // route substrings ("/auth/login", "accept-invitation",
+    // "/auth/refresh") — meaning every new pre-tenant route added since
+    // (register, select-tenant, create-tenant, the OAuth endpoints,
+    // set-mobile) was silently missing from it, and would 500 the
+    // instant a real request hit AuditLog's non-nullable tenantId
+    // column with no tenant to record. Checking whether tenant context
+    // actually exists is self-maintaining — it's correct for any route
+    // that doesn't have one, present or future, without needing to
+    // enumerate them.
+    if (!isMutating || !this.tenantCtx.hasTenantId()) return next.handle();
 
     const occurredAt = new Date();
-
 
     /**
      * RxJS operators manipulate the responses. finalize() is one such operator.
      * the finalize operator will run regardless of whether the request succeeds or crashes.
      * The pipe wraps the request and waits for the route handler to complete
      */
-    console.log('interceptor Provider defined?', !!this.tenantCtx);
-
     return next.handle().pipe(
       tap(() => {
-          // Tenant context is set by TenantGuard (for protected routes).
-          // For non-tenant routes, you can skip audit or set tenantId null.
-          // Here we enforce tenant for mutations.
           const tenantId = this.tenantCtx.getTenantId();
-          console.log(`Current Tenant ID ${tenantId}`);
-
 
           this.audits.save({
             tenantId,

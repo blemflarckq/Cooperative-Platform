@@ -36,7 +36,7 @@ export function RegisterPage() {
 
   function onSubmit(values: RegisterFormValues) {
     registerMutation.mutate(values, {
-      onSuccess: handleAuthResult,
+      onSuccess: (result) => handleAuthResult(result),
       onError: (error) => toast.error(getApiErrorMessage(error)),
     });
   }

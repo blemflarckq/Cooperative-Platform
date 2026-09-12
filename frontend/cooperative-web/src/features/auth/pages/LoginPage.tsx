@@ -33,7 +33,7 @@ export function LoginPage() {
 
   function onSubmit(values: LoginFormValues) {
     loginMutation.mutate(values, {
-      onSuccess: handleAuthResult,
+      onSuccess: (result) => handleAuthResult(result),
       onError: (error) => toast.error(getApiErrorMessage(error)),
     });
   }

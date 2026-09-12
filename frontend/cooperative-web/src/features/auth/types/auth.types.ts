@@ -16,6 +16,7 @@ export interface AuthenticatedUserResponse {
   email: string;
   firstName: string;
   lastName: string;
+  mobile: string | null;
   tenantId?: string;
   tenantName?: string;
    roles?: string[];

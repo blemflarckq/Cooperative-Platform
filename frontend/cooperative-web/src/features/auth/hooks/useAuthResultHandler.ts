@@ -8,6 +8,14 @@ import { useSelectTenant } from "@/features/auth/hooks/useSelectTenant";
 import { getApiErrorMessage } from "@/lib/api/api-error";
 import type { AuthResult, TenantOption } from "@/features/auth/types/auth.types";
 
+/**
+ * Shared by every place a session can actually complete — Login,
+ * Register, the OAuth callback, and CreateTenantPage. One definition of
+ * "what happens once we have a real session," including the phone
+ * number gate — applying it in only some of these places would have
+ * left OAuth users covered but native-registered-then-create-tenant
+ * users slipping through, which isn't the intent.
+ */
 export function useAuthResultHandler() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,11 +29,21 @@ export function useAuthResultHandler() {
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? "/app/dashboard";
 
-  function completeSession(response: {
-    accessToken: string;
-    refreshToken: string;
-    user: Parameters<typeof mapAuthenticatedUser>[0];
-  }) {
+  /**
+   * `nextOverride` lets a caller like CreateTenantPage say "go here
+   * next" (e.g. the scheme-setup step) instead of the default
+   * dashboard/`from` redirect — the mobile and mustChangePassword gates
+   * apply identically either way, they just determine what "next"
+   * actually means before handing off to it.
+   */
+  function completeSession(
+    response: {
+      accessToken: string;
+      refreshToken: string;
+      user: Parameters<typeof mapAuthenticatedUser>[0];
+    },
+    options?: { nextOverride?: string; successMessage?: string },
+  ) {
     const mappedUser = mapAuthenticatedUser(response.user);
     login({
       accessToken: response.accessToken,
@@ -33,18 +51,24 @@ export function useAuthResultHandler() {
       user: mappedUser,
     });
 
-    if (mappedUser.mustChangePassword) {
-      navigate("/app/change-password", { replace: true });
+    const next =
+      options?.nextOverride ??
+      (mappedUser.mustChangePassword ? "/app/change-password" : redirectTo);
+
+    if (!mappedUser.mobile) {
+      navigate("/add-phone", { replace: true, state: { next } });
       return;
     }
 
-    toast.success("Signed in successfully");
-    navigate(redirectTo, { replace: true });
+    if (options?.successMessage !== "") {
+      toast.success(options?.successMessage ?? "Signed in successfully");
+    }
+    navigate(next, { replace: true });
   }
 
-  function handleAuthResult(result: AuthResult) {
+  function handleAuthResult(result: AuthResult, options?: { nextOverride?: string }) {
     if (result.status === "authenticated") {
-      completeSession(result);
+      completeSession(result, options);
       return;
     }
 
@@ -74,6 +98,7 @@ export function useAuthResultHandler() {
   return {
     tenantChoice,
     handleAuthResult,
+    completeSession,
     handleSelectTenant,
     isSelectingTenant: selectTenantMutation.isPending,
   };
