@@ -66,8 +66,26 @@ apiClient.interceptors.response.use(
     }
 
     const isUnauthorized = error.response?.status === 401;
-    const isRefreshRequest = originalRequest.url?.includes("/auth/refresh");
-    if (!isUnauthorized || originalRequest._retry || isRefreshRequest) {
+    // Previously only /auth/refresh itself was excluded — but every one
+    // of these is a PRE-session request: there's no real access token
+    // involved yet, so a 401 from any of them means "these credentials/
+    // this code were wrong," not "my session token went stale." Treating
+    // it as the latter and attempting a refresh-and-retry is conceptually
+    // wrong regardless of whether it happens to behave safely — this
+    // request was never tied to a stored session to refresh in the
+    // first place.
+    const PRE_SESSION_AUTH_PATHS = [
+      "/auth/login",
+      "/auth/register",
+      "/auth/select-tenant",
+      "/auth/create-tenant",
+      "/auth/oauth-complete",
+      "/auth/refresh",
+    ];
+    const isPreSessionRequest = PRE_SESSION_AUTH_PATHS.some((path) =>
+      originalRequest.url?.includes(path),
+    );
+    if (!isUnauthorized || originalRequest._retry || isPreSessionRequest) {
       return Promise.reject(error);
     }
 

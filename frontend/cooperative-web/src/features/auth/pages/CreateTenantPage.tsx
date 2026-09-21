@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Landmark } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { toast } from "sonner";
@@ -27,8 +27,18 @@ export function CreateTenantPage() {
   const preAuthToken = (location.state as { preAuthToken?: string } | null)?.preAuthToken;
   const [name, setName] = useState("");
 
+  // Calling navigate() directly in the component body, during render,
+  // is a real React anti-pattern — it mutates router state while React
+  // is still computing this render, which can throw or otherwise
+  // misbehave depending on the exact React/React Router versions and
+  // dev-mode conditions in play. This belongs in an effect.
+  useEffect(() => {
+    if (!preAuthToken) {
+      navigate("/login", { replace: true });
+    }
+  }, [preAuthToken, navigate]);
+
   if (!preAuthToken) {
-    navigate("/login", { replace: true });
     return null;
   }
 

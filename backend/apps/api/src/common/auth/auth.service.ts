@@ -251,7 +251,12 @@ export class AuthService {
       oauthResult: result,
     };
 
-    return this.jwt.signAsync(payload, { expiresIn: "60s" });
+    // 60 seconds was too tight for a real browser redirect — any delay
+    // loading the frontend page (slow dev-server compile, a moment's
+    // hesitation, anything) could make this expire before the exchange
+    // even happens. 5 minutes matches the pre-auth token's own window;
+    // still short enough that a stale/replayed code is rejected quickly.
+    return this.jwt.signAsync(payload, { expiresIn: "5m" });
   }
 
   async completeOAuth(code: string): Promise<AuthResult> {
