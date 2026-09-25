@@ -13,7 +13,7 @@ import { PostingLineInput } from "../../accounting/posting/posting-engine.servic
 import { PostingEngineService } from "../../accounting/posting/posting-engine.service";
 import { AccountResolverService, SystemAccountKey } from "../../accounting/services/account-resolver.service";
 import { ActorTenantUserResolverService } from "../../schemes/services/actor-tenant-user-resolver.service";
-import { allocateAcrossPledges, allocateRepayment } from "./loan-repayment-allocation";
+import { allocateAcrossPledges, allocateRepayment, computeLoanPayoffAmount } from "./loan-repayment-allocation";
 
 @Injectable()
 export class LoanRepaymentsService {
@@ -66,29 +66,13 @@ export class LoanRepaymentsService {
       // Reject overpayment outright rather than silently absorbing the
       // excess as an "interest credit" — that could mask a genuine user
       // error (a fat-fingered amount) as if it were a deliberate bonus
-      // contribution. Same interest formula the allocation math below
-      // uses, computed here first so we can give a precise, actionable
-      // max-payable figure in the rejection message.
-      const selfInterestDue =
-        Math.round(
-          Number(loan.selfFundedOutstandingPrincipal) *
-            (Number(loan.selfFundedMonthlyRate) / 100) *
-            100,
-        ) / 100;
-      const peerInterestDue =
-        Math.round(
-          Number(loan.peerFundedOutstandingPrincipal) *
-            (Number(loan.currentPeerMonthlyRate) / 100) *
-            100,
-        ) / 100;
-      const truePayoffAmount =
-        Math.round(
-          (Number(loan.selfFundedOutstandingPrincipal) +
-            Number(loan.peerFundedOutstandingPrincipal) +
-            selfInterestDue +
-            peerInterestDue) *
-            100,
-        ) / 100;
+      // contribution.
+      const { truePayoffAmount } = computeLoanPayoffAmount({
+        selfFundedOutstandingPrincipal: Number(loan.selfFundedOutstandingPrincipal),
+        selfFundedMonthlyRate: Number(loan.selfFundedMonthlyRate),
+        peerFundedOutstandingPrincipal: Number(loan.peerFundedOutstandingPrincipal),
+        peerFundedMonthlyRate: Number(loan.currentPeerMonthlyRate),
+      });
 
       if (paymentAmount > truePayoffAmount) {
         throw new BadRequestException(

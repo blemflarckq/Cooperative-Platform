@@ -1,12 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { TenantUser } from "../../identity/entities/tenant-user.entity";
-import { CooperativeScheme } from "../../schemes/entities/cooperative-scheme.entity";
-import { SchemeStatus } from "../../schemes/enums/scheme.enums";
 import { Loan } from "../../loans/entities/loan.entity";
 import { LoanStatus } from "../../loans/enums/loan.enums";
 import { OutboundRequest } from "../../schemes/entities/outbound-request.entity";
 import { OutboundRequestStatus } from "../../schemes/enums/governance.enums";
+import { getTenantSummaryCounts } from "./tenant-summary";
 
 const APPROVAL_AGING_THRESHOLD_DAYS = 3;
 
@@ -46,27 +44,14 @@ export class AdminDashboardService {
   constructor(private readonly dataSource: DataSource) {}
 
   async getAdminDashboard(tenantId: string): Promise<AdminDashboardData> {
-    const [activeMemberCount, activeSchemeCount, loanPortfolio, approvals] =
+    const [{ activeMemberCount, activeSchemeCount }, loanPortfolio, approvals] =
       await Promise.all([
-        this.getActiveMemberCount(tenantId),
-        this.getActiveSchemeCount(tenantId),
+        getTenantSummaryCounts(this.dataSource, tenantId),
         this.getLoanPortfolioHealth(tenantId),
         this.getApprovalAging(tenantId),
       ]);
 
     return { activeMemberCount, activeSchemeCount, loanPortfolio, approvals };
-  }
-
-  private async getActiveMemberCount(tenantId: string): Promise<number> {
-    return this.dataSource
-      .getRepository(TenantUser)
-      .count({ where: { tenantId, isActive: true } });
-  }
-
-  private async getActiveSchemeCount(tenantId: string): Promise<number> {
-    return this.dataSource
-      .getRepository(CooperativeScheme)
-      .count({ where: { tenantId, status: SchemeStatus.ACTIVE } });
   }
 
   private async getLoanPortfolioHealth(

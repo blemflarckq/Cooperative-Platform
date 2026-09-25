@@ -41,6 +41,53 @@ function splitProportionally(
   return [shareA, shareB];
 }
 
+export interface LoanPayoffSummary {
+  selfInterestDue: number;
+  peerInterestDue: number;
+  totalInterestDue: number;
+  totalOutstandingPrincipal: number;
+  /** Principal + accrued interest — the actual amount that closes the
+   * loan out entirely right now, not just the outstanding principal
+   * alone (paying exactly the principal always leaves a residual, since
+   * interest is deducted first). */
+  truePayoffAmount: number;
+}
+
+/**
+ * Was duplicated across three separate backend services (and once more
+ * on the frontend) before this — each one independently reimplementing
+ * the same reducing-balance interest calculation. Extracted here as the
+ * one definition, alongside allocateRepayment which already used this
+ * exact formula internally without exposing it as its own reusable
+ * piece.
+ */
+export function computeLoanPayoffAmount(input: {
+  selfFundedOutstandingPrincipal: number;
+  selfFundedMonthlyRate: number;
+  peerFundedOutstandingPrincipal: number;
+  peerFundedMonthlyRate: number;
+}): LoanPayoffSummary {
+  const selfInterestDue = round2(
+    (input.selfFundedOutstandingPrincipal * input.selfFundedMonthlyRate) / 100,
+  );
+  const peerInterestDue = round2(
+    (input.peerFundedOutstandingPrincipal * input.peerFundedMonthlyRate) / 100,
+  );
+  const totalInterestDue = round2(selfInterestDue + peerInterestDue);
+  const totalOutstandingPrincipal = round2(
+    input.selfFundedOutstandingPrincipal + input.peerFundedOutstandingPrincipal,
+  );
+  const truePayoffAmount = round2(totalOutstandingPrincipal + totalInterestDue);
+
+  return {
+    selfInterestDue,
+    peerInterestDue,
+    totalInterestDue,
+    totalOutstandingPrincipal,
+    truePayoffAmount,
+  };
+}
+
 /**
  * Allocates one repayment amount across a loan's two tranches. Interest
  * due is paid first (on both tranches, proportionally if the payment is
@@ -56,13 +103,7 @@ export function allocateRepayment(input: {
   peerFundedOutstandingPrincipal: number;
   peerFundedMonthlyRate: number;
 }): RepaymentAllocation {
-  const selfInterestDue = round2(
-    (input.selfFundedOutstandingPrincipal * input.selfFundedMonthlyRate) / 100,
-  );
-  const peerInterestDue = round2(
-    (input.peerFundedOutstandingPrincipal * input.peerFundedMonthlyRate) / 100,
-  );
-  const totalInterestDue = round2(selfInterestDue + peerInterestDue);
+  const { selfInterestDue, peerInterestDue, totalInterestDue } = computeLoanPayoffAmount(input);
 
   if (totalInterestDue > 0 && input.amount <= totalInterestDue) {
     const [selfFundedInterestPortion, peerFundedInterestPortion] =
