@@ -98,6 +98,17 @@ export class Loan extends BaseEntity {
   @Column({ type: "boolean", default: false })
   isAtRiskFlagged!: boolean;
 
+  /**
+   * Set at the exact moment isAtRiskFlagged flips to true — deliberately
+   * separate from updatedAt, which bumps on any change to this row and
+   * would silently misreport "how long has this been at risk" as "when
+   * was this loan last touched at all." Needed for the admin dashboard's
+   * "oldest at-risk case" metric to actually be true rather than an
+   * approximation dressed up as a real number.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  flaggedAtRiskAt!: Date | null;
+
   @Column({ type: "uuid", nullable: true })
   outboundRequestId!: string | null;
 

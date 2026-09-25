@@ -60,6 +60,7 @@ export class LoanRateEscalationService {
 
       if (shouldFlagAtRisk) {
         loan.isAtRiskFlagged = true;
+        loan.flaggedAtRiskAt = new Date();
         loan.status = LoanStatus.AT_RISK;
       }
 
