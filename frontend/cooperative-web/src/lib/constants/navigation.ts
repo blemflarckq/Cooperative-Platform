@@ -44,6 +44,15 @@ export const APP_NAV_GROUPS: NavGroup[] = [
         to: "/dashboard",
         icon: LayoutDashboard,
       },
+      {
+        label: "Tenant Health",
+        to: "/admin-dashboard",
+        icon: Scale,
+        // Same permission the backend endpoint itself checks — an
+        // entirely separate screen, not a mode toggle on the member
+        // dashboard, matching the explicit product decision.
+        permissions: ["accounting_settings:update"],
+      },
     ],
   },
   {
