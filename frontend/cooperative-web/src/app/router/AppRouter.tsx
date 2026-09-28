@@ -9,7 +9,7 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { OAuthCallbackPage } from "@/features/auth/pages/OAuthCallbackPage";
 import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
 import { SetupSchemePage } from "@/features/setup/pages/SetupSchemePage";
-import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
+import { MemberDashboardPage } from "@/features/dashboard/pages/MemberDashboardPage";
 import { AdminDashboardPage } from "@/features/dashboard/pages/AdminDashboardPage";
 import { TenantUsersPage } from "@/features/tenant-users/pages/TenantUsersPage";
 import { CreateTenantUserPage } from "@/features/tenant-users/pages/CreateTenantUserPage";
@@ -93,7 +93,7 @@ export function AppRouter() {
           <Route path="change-password" element={<ChangePasswordPage />} />
           <Route element={<MustChangePasswordGuard />}>
             <Route index element={<AppIndexRedirect />} />
-            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="dashboard" element={<MemberDashboardPage />} />
             <Route path="admin-dashboard" element={<AdminDashboardPage />} />
             <Route path="members">
               <Route index element={<TenantUsersPage />} />

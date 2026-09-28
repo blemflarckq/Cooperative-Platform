@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Users, Layers } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/feedback/LoadingState";
@@ -7,6 +7,7 @@ import { PermissionGate } from "@/components/common/PermissionGate";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { formatCurrency } from "@/lib/formatting/currency";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
+import { TenantSummaryStrip } from "../components/TenantSummaryStrip";
 
 /**
  * A genuinely separate screen from the member dashboard, not a mode
@@ -39,22 +40,10 @@ export function AdminDashboardPage() {
           <h1 className="text-lg font-semibold">{user?.tenantName ?? "Your cooperative"}</h1>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <Card className="rounded-lg border-0 bg-[var(--secondary)] p-3.5 shadow-none ring-0">
-            <div className="flex items-center gap-1.5">
-              <Users className="size-3.5 text-[var(--muted-foreground)]" />
-              <span className="text-xl font-medium">{data.activeMemberCount}</span>
-            </div>
-            <div className="text-xs text-[var(--muted-foreground)]">active members</div>
-          </Card>
-          <Card className="rounded-lg border-0 bg-[var(--secondary)] p-3.5 shadow-none ring-0">
-            <div className="flex items-center gap-1.5">
-              <Layers className="size-3.5 text-[var(--muted-foreground)]" />
-              <span className="text-xl font-medium">{data.activeSchemeCount}</span>
-            </div>
-            <div className="text-xs text-[var(--muted-foreground)]">active schemes</div>
-          </Card>
-        </div>
+        <TenantSummaryStrip
+          activeMemberCount={data.activeMemberCount}
+          activeSchemeCount={data.activeSchemeCount}
+        />
 
         <div>
           <div className="mb-2 text-xs text-[var(--muted-foreground)]">Loan portfolio</div>
