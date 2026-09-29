@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { TypeOrmRootModule } from './config/typeorm.module';
 import { CommonModule } from "./common/common.module";
@@ -20,6 +21,7 @@ import { HealthModule } from "./common/health/health.module";
 import { LoansModule } from "./modules/loans/loans.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { MembershipModule } from "./modules/membership/membership.module";
 /**
  * AppModule wires global guards/interceptors.
  *
@@ -42,6 +44,12 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     LoansModule,
     PaymentsModule,
     DashboardModule,
+    MembershipModule,
+    // Enables @Cron() decorators anywhere in the app — the first real
+    // use is MembershipEnrollmentCleanupTask; the pinned loan
+    // rate-escalation scheduler can run on this same infrastructure
+    // once its cadence is decided, rather than each needing its own.
+    ScheduleModule.forRoot(),
     // Baseline rate limiting: 100 requests per 60s window per client by
     // default. Money-moving endpoints (login, transfers) can override this
     // per-route with @Throttle() later if a tighter limit is warranted.
