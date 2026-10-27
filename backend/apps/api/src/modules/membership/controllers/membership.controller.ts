@@ -3,19 +3,19 @@ import { TenantId } from "../../../common/tenancy/tenant-id.decorator";
 import { CurrentUser } from "../../../common/auth/current-user.decorator";
 import { Public } from "../../../common/auth/public.decorator";
 import { SkipTenantCheck } from "../../../common/tenancy/skip-tenant-check.decorator";
+import { AuthService } from "../../../common/auth/auth.service";
 import { MembershipEnrollmentService } from "../services/membership-enrollment.service";
 import { RecordEnrollmentDecisionDto } from "../dto/record-enrollment-decision.dto";
+import { JoinWithInviteDto } from "../dto/join-with-invite.dto";
 
 @Controller("membership")
 export class MembershipController {
-  constructor(private readonly enrollmentService: MembershipEnrollmentService) {}
+  constructor(
+    private readonly enrollmentService: MembershipEnrollmentService,
+    private readonly auth: AuthService,
+  ) {}
 
-  /**
-   * Staff-only, enforced inside the service (tenant_admin/treasurer) —
-   * not a @RequirePermissions() check here, since this doesn't map to an
-   * existing permission and inventing one for a single call site wasn't
-   * worth it next to the service already doing this check directly.
-   */
+  /** Staff-only, enforced inside the service (tenant_admin/treasurer). */
   @Post("invite-links")
   async generateInviteLink(
     @TenantId() tenantId: string,
@@ -31,8 +31,8 @@ export class MembershipController {
   }
 
   /**
-   * Requires real authentication (so NOT @Public()) but the target
-   * tenant comes from the token itself, not the caller's current
+   * For someone who already has a session (an access token). The target
+   * tenant comes from the invite token itself, not the caller's current
    * session — see SkipTenantCheck for why the normal X-Tenant-Id rule
    * doesn't apply here.
    */
@@ -45,9 +45,31 @@ export class MembershipController {
     return this.enrollmentService.acceptInvite(token, actorUserId);
   }
 
+  /**
+   * For someone who has just signed in or registered but belongs to no
+   * cooperative yet — which is exactly the typical invitee. Access
+   * tokens are only ever issued for a tenant the person is already a
+   * member of, so a brand-new person has only a pre-auth token at this
+   * point; the /accept route above can't serve them. Same pattern
+   * select-tenant and create-tenant already use: @Public(), with the
+   * pre-auth token verified from the body.
+   */
+  @Public()
+  @Post("invite-links/:token/join")
+  async joinWithPreAuthToken(
+    @Param("token") token: string,
+    @Body() dto: JoinWithInviteDto,
+  ) {
+    const user = await this.auth.loadUserFromPreAuthToken(dto.preAuthToken);
+    return this.enrollmentService.acceptInvite(token, user.id);
+  }
+
   @Get("enrollments/pending")
-  async listPendingEnrollments(@TenantId() tenantId: string) {
-    return this.enrollmentService.listPendingEnrollments(tenantId);
+  async listPendingEnrollments(
+    @TenantId() tenantId: string,
+    @CurrentUser("sub") actorUserId: string,
+  ) {
+    return this.enrollmentService.listPendingEnrollments(tenantId, actorUserId);
   }
 
   @Post("enrollments/:id/decision")

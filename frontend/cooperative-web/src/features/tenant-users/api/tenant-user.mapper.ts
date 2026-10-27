@@ -25,6 +25,8 @@ export function mapTenantUserToListItem(
     createdAt: response.createdAt,
     updatedAt: response.updatedAt,
     roles: response.roles ?? [],
+    mobileMasked: response.user?.mobileMasked ?? null,
+    schemeNames: response.schemeNames ?? [],
   };
 }
 

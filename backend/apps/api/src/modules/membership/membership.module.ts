@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CommonModule } from "../../common/common.module";
 import { MembershipEnrollmentService } from "./services/membership-enrollment.service";
 import { MembershipEnrollmentCleanupTask } from "./services/membership-enrollment-cleanup.task";
 import { MembershipController } from "./controllers/membership.controller";
@@ -11,6 +12,7 @@ import { MembershipController } from "./controllers/membership.controller";
  * registration.
  */
 @Module({
+  imports: [CommonModule],
   providers: [MembershipEnrollmentService, MembershipEnrollmentCleanupTask],
   controllers: [MembershipController],
 })

@@ -53,7 +53,9 @@ export class TenantUsersController {
     @Query() query: ListTenantUsersQueryDto,
   ) {
     const rows = await this.tenantUsersService.listTenantUsers(tenantId, query);
-    return rows.map(TenantUserResponseMapper.toResponse);
+    return rows.map(({ tenantUser, schemeNames }) =>
+      TenantUserResponseMapper.toResponse(tenantUser, schemeNames),
+    );
   }
 
   /**

@@ -20,9 +20,11 @@ export interface TenantUserResponse {
     email: string;
     firstName: string;
     lastName: string;
+    mobileMasked: string | null;
     isActive: boolean;
   } | null;
   roles: TenantRoleSummary[];
+  schemeNames: string[];
 }
 
 export interface TenantUserListItem {
@@ -39,6 +41,8 @@ export interface TenantUserListItem {
   createdAt: string;
   updatedAt: string;
   roles: TenantRoleSummary[];
+  mobileMasked: string | null;
+  schemeNames: string[];
 }
 
 //export interface TenantUserDetails extends TenantUserListItem {}

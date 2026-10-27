@@ -82,9 +82,14 @@ apiClient.interceptors.response.use(
       "/auth/oauth-complete",
       "/auth/refresh",
     ];
-    const isPreSessionRequest = PRE_SESSION_AUTH_PATHS.some((path) =>
-      originalRequest.url?.includes(path),
-    );
+    const isPreSessionRequest =
+      PRE_SESSION_AUTH_PATHS.some((path) => originalRequest.url?.includes(path)) ||
+      // Joining a cooperative via an invite with a pre-auth token: no
+      // session is involved, so a 401 means "that token was bad," never
+      // "refresh my session." Matched by suffix because the same
+      // /membership/invite-links/ prefix also hosts the authenticated
+      // /accept route, where a 401 SHOULD still trigger a refresh.
+      Boolean(originalRequest.url?.endsWith("/join"));
     if (!isUnauthorized || originalRequest._retry || isPreSessionRequest) {
       return Promise.reject(error);
     }

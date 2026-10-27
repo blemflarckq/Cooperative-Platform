@@ -13,6 +13,8 @@ import { Role } from '../entities/role.entity';
 import { CreateTenantUserDto } from '../dto/create-tenant-user.dto';
 import { UpdateTenantUserDto } from '../dto/update-tenant-user.dto';
 import { ListTenantUsersQueryDto } from '../dto/list-tenant-users.query.dto';
+import { CycleParticipant } from '../../schemes/entities/cycle-participant.entity';
+import { CycleParticipantStatus, OperatingCycleStatus, SchemeStatus } from '../../schemes/enums/scheme.enums';
 import { IdentityOutboxService } from '../services/identity-outbox.service';
 import { CreateTempPasswordUserDto } from '../dto/create-temp-password-user.dto';
 import { hashPassword } from '../../../common/auth/password';
@@ -259,7 +261,7 @@ async createWithTemporaryPassword(params: {
   async listTenantUsers(
     tenantId: string,
     query: ListTenantUsersQueryDto,
-  ): Promise<TenantUser[]> {
+  ): Promise<Array<{ tenantUser: TenantUser; schemeNames: string[] }>> {
 
     const qb = this.tenantUsersRepository
       .createQueryBuilder('tenantUser')
@@ -288,7 +290,39 @@ async createWithTemporaryPassword(params: {
       );
     }
 
-    return await qb.getMany();
+    const tenantUsers = await qb.getMany();
+
+    if (tenantUsers.length === 0) {
+      return [];
+    }
+
+    // One batch query for every member's active scheme participation,
+    // rather than one query per row — resolved the same way the member
+    // dashboard resolves a person's own active schemes.
+    const participations = await this.tenantUsersRepository.manager
+      .createQueryBuilder(CycleParticipant, 'participant')
+      .innerJoin('participant.cycle', 'cycle')
+      .innerJoin('cycle.scheme', 'scheme')
+      .where('participant.tenantId = :tenantId', { tenantId })
+      .andWhere('participant.status = :participantStatus', {
+        participantStatus: CycleParticipantStatus.ACTIVE,
+      })
+      .andWhere('cycle.status = :cycleStatus', { cycleStatus: OperatingCycleStatus.OPEN })
+      .andWhere('scheme.status = :schemeStatus', { schemeStatus: SchemeStatus.ACTIVE })
+      .select(['participant.tenantUserId AS "tenantUserId"', 'scheme.name AS "schemeName"'])
+      .getRawMany<{ tenantUserId: string; schemeName: string }>();
+
+    const schemeNamesByTenantUserId = new Map<string, string[]>();
+    for (const row of participations) {
+      const existing = schemeNamesByTenantUserId.get(row.tenantUserId) ?? [];
+      existing.push(row.schemeName);
+      schemeNamesByTenantUserId.set(row.tenantUserId, existing);
+    }
+
+    return tenantUsers.map((tenantUser) => ({
+      tenantUser,
+      schemeNames: schemeNamesByTenantUserId.get(tenantUser.id) ?? [],
+    }));
   }
 
   async getTenantUser(tenantId: string, tenantUserId: string): Promise<TenantUser> {

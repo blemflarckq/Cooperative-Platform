@@ -3,6 +3,7 @@ import { ApprovalDecision } from '../../schemes/enums/governance.enums';
 import { MembershipEnrollmentStatus } from '../enums/membership-enrollment.enums';
 import {
   assertCanRecordEnrollmentApproval,
+  isEnrollmentExpiredWithoutApproval,
   resolveEnrollmentStatus,
   RecordEnrollmentApprovalInput,
   REQUIRED_ENROLLMENT_APPROVALS,
@@ -80,5 +81,39 @@ describe('resolveEnrollmentStatus', () => {
         requiredApprovals: REQUIRED_ENROLLMENT_APPROVALS,
       }),
     ).toBe(MembershipEnrollmentStatus.REJECTED);
+  });
+});
+
+describe('isEnrollmentExpiredWithoutApproval', () => {
+  const now = new Date('2026-10-01T12:00:00Z');
+  const past = new Date('2026-10-01T08:00:00Z');
+  const future = new Date('2026-10-01T16:00:00Z');
+
+  it('is not expired while the window is still open', () => {
+    expect(isEnrollmentExpiredWithoutApproval({ expiresAt: future, decisions: [], now })).toBe(false);
+  });
+
+  it('is expired once the window has passed with no approvals', () => {
+    expect(isEnrollmentExpiredWithoutApproval({ expiresAt: past, decisions: [], now })).toBe(true);
+  });
+
+  it('stays alive past the window if it has at least one approval', () => {
+    expect(
+      isEnrollmentExpiredWithoutApproval({
+        expiresAt: past,
+        decisions: [ApprovalDecision.APPROVED],
+        now,
+      }),
+    ).toBe(false);
+  });
+
+  it('a rejection alone does not keep an expired enrollment alive', () => {
+    expect(
+      isEnrollmentExpiredWithoutApproval({
+        expiresAt: past,
+        decisions: [ApprovalDecision.REJECTED],
+        now,
+      }),
+    ).toBe(true);
   });
 });

@@ -6,7 +6,11 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { mapAuthenticatedUser } from "@/features/auth/api/auth.mapper";
 import { useSelectTenant } from "@/features/auth/hooks/useSelectTenant";
 import { getApiErrorMessage } from "@/lib/api/api-error";
+import { joinWithPreAuthToken } from "@/features/membership/api/membership.api";
+import { clearPendingInvite, readPendingInvite } from "@/features/membership/lib/pending-invite";
 import type { AuthResult, TenantOption } from "@/features/auth/types/auth.types";
+
+type NoSessionResult = Extract<AuthResult, { status: "select_tenant" | "no_tenant" }>;
 
 /**
  * Shared by every place a session can actually complete — Login,
@@ -15,6 +19,13 @@ import type { AuthResult, TenantOption } from "@/features/auth/types/auth.types"
  * number gate — applying it in only some of these places would have
  * left OAuth users covered but native-registered-then-create-tenant
  * users slipping through, which isn't the intent.
+ *
+ * It's also where a person who arrived via an invite link is recognised
+ * (the link is remembered in sessionStorage across the sign-in detour).
+ * Someone who proved who they are but belongs to no cooperative yet only
+ * ever holds a pre-auth token, so their request is submitted with that;
+ * someone who already has a full session is sent back to the join page
+ * to send it themselves.
  */
 export function useAuthResultHandler() {
   const navigate = useNavigate();
@@ -51,9 +62,15 @@ export function useAuthResultHandler() {
       user: mappedUser,
     });
 
+    const pendingInvite = readPendingInvite();
+
     const next =
       options?.nextOverride ??
-      (mappedUser.mustChangePassword ? "/app/change-password" : redirectTo);
+      (mappedUser.mustChangePassword
+        ? "/app/change-password"
+        : pendingInvite
+          ? `/join/${pendingInvite}`
+          : redirectTo);
 
     if (!mappedUser.mobile) {
       navigate("/add-phone", { replace: true, state: { next } });
@@ -66,12 +83,7 @@ export function useAuthResultHandler() {
     navigate(next, { replace: true });
   }
 
-  function handleAuthResult(result: AuthResult, options?: { nextOverride?: string }) {
-    if (result.status === "authenticated") {
-      completeSession(result, options);
-      return;
-    }
-
+  function proceedWithoutInvite(result: NoSessionResult) {
     if (result.status === "select_tenant") {
       setTenantChoice({ preAuthToken: result.preAuthToken, tenants: result.tenants });
       return;
@@ -81,6 +93,40 @@ export function useAuthResultHandler() {
       replace: true,
       state: { preAuthToken: result.preAuthToken },
     });
+  }
+
+  function handleAuthResult(result: AuthResult, options?: { nextOverride?: string }) {
+    if (result.status === "authenticated") {
+      completeSession(result, options);
+      return;
+    }
+
+    const pendingInvite = readPendingInvite();
+
+    if (!pendingInvite) {
+      proceedWithoutInvite(result);
+      return;
+    }
+
+    // Plain promise, not a mutation: this runs from inside another
+    // mutation's success callback, and the whole point is that its
+    // outcome must not depend on any component staying mounted.
+    joinWithPreAuthToken(pendingInvite, result.preAuthToken)
+      .then((joined) => {
+        clearPendingInvite();
+        navigate(`/join/${pendingInvite}`, {
+          replace: true,
+          state: { submittedTenantName: joined.tenantName },
+        });
+      })
+      .catch((error) => {
+        // The invite didn't work (expired, already used...). Say so, then
+        // carry on exactly as if they'd signed in normally — they still
+        // proved who they are.
+        clearPendingInvite();
+        toast.error(getApiErrorMessage(error));
+        proceedWithoutInvite(result);
+      });
   }
 
   function handleSelectTenant(tenantId: string) {

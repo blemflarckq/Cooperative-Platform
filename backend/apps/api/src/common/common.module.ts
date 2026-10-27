@@ -33,6 +33,6 @@ import { getRequiredEnv } from "../config/env";
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, GoogleStrategy, FacebookStrategy],
-  exports: [JwtModule/*, TenantContextService*/,TypeOrmModule],
+  exports: [JwtModule/*, TenantContextService*/, TypeOrmModule, AuthService],
 })
 export class CommonModule {}

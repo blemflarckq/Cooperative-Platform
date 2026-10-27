@@ -11,7 +11,8 @@ import { CreateTenantPage } from "@/features/auth/pages/CreateTenantPage";
 import { SetupSchemePage } from "@/features/setup/pages/SetupSchemePage";
 import { MemberDashboardPage } from "@/features/dashboard/pages/MemberDashboardPage";
 import { AdminDashboardPage } from "@/features/dashboard/pages/AdminDashboardPage";
-import { TenantUsersPage } from "@/features/tenant-users/pages/TenantUsersPage";
+import { MembersPage } from "@/features/tenant-users/pages/MembersPage";
+import { JoinPage } from "@/features/membership/pages/JoinPage";
 import { CreateTenantUserPage } from "@/features/tenant-users/pages/CreateTenantUserPage";
 import { TenantUserDetailsPage } from "@/features/tenant-users/pages/TenantUserDetailsPage";
 import { EditTenantUserPage } from "@/features/tenant-users/pages/EditTenantUserPage";
@@ -81,6 +82,7 @@ export function AppRouter() {
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/create-tenant" element={<CreateTenantPage />} />
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+        <Route path="/join/:token" element={<JoinPage />} />
         <Route path="/reset-password" element={<ResetPasswordPlaceholderPage />} />
       </Route>
 
@@ -96,7 +98,7 @@ export function AppRouter() {
             <Route path="dashboard" element={<MemberDashboardPage />} />
             <Route path="admin-dashboard" element={<AdminDashboardPage />} />
             <Route path="members">
-              <Route index element={<TenantUsersPage />} />
+              <Route index element={<MembersPage />} />
               <Route path="new" element={<CreateTenantUserPage />} />
               <Route path=":tenantUserId" element={<TenantUserDetailsPage />} />
               <Route path=":tenantUserId/edit" element={<EditTenantUserPage />} />

@@ -278,11 +278,13 @@ export class AuthService {
   }
 
   /**
-   * Second step for the multi-tenant case — exchanges a pre-auth token
-   * (identity already confirmed, no tenant chosen yet) plus a chosen
-   * tenant for a real, tenant-scoped session.
+   * Verifies a pre-auth token (issued after credentials are proven but
+   * before any tenant is chosen) and returns the active user it names.
+   * Previously copy-pasted into selectTenant and createTenant; now the
+   * one definition, also used by the invite-join route, which needs
+   * exactly the same guarantee for someone with no tenant yet.
    */
-  async selectTenant(preAuthToken: string, tenantId: string): Promise<LoginResponse> {
+  async loadUserFromPreAuthToken(preAuthToken: string): Promise<User> {
     let payload: AuthJwtPayload;
 
     try {
@@ -294,7 +296,7 @@ export class AuthService {
     }
 
     if (payload.tokenType !== "pre_auth") {
-      throw new UnauthorizedException("Invalid token for tenant selection.");
+      throw new UnauthorizedException("Invalid token for this action.");
     }
 
     const user = await this.users.findOne({
@@ -304,6 +306,17 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException("User account is inactive or no longer exists.");
     }
+
+    return user;
+  }
+
+  /**
+   * Second step for the multi-tenant case — exchanges a pre-auth token
+   * (identity already confirmed, no tenant chosen yet) plus a chosen
+   * tenant for a real, tenant-scoped session.
+   */
+  async selectTenant(preAuthToken: string, tenantId: string): Promise<LoginResponse> {
+    const user = await this.loadUserFromPreAuthToken(preAuthToken);
 
     const membership = await this.tenantUsers.findOne({
       where: { userId: user.id, tenantId, isActive: true },
@@ -327,27 +340,7 @@ export class AuthService {
    * transaction.
    */
   async createTenant(preAuthToken: string, name: string): Promise<LoginResponse> {
-    let payload: AuthJwtPayload;
-
-    try {
-      payload = await this.jwt.verifyAsync<AuthJwtPayload>(preAuthToken, {
-        secret: getRequiredEnv("JWT_ACCESS_SECRET"),
-      });
-    } catch {
-      throw new UnauthorizedException("Invalid or expired session — please log in again.");
-    }
-
-    if (payload.tokenType !== "pre_auth") {
-      throw new UnauthorizedException("Invalid token for creating a cooperative.");
-    }
-
-    const user = await this.users.findOne({
-      where: { id: payload.sub, isActive: true },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException("User account is inactive or no longer exists.");
-    }
+    const user = await this.loadUserFromPreAuthToken(preAuthToken);
 
     const trimmedName = name.trim();
 

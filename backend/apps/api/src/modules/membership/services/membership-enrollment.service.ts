@@ -8,9 +8,11 @@ import { MembershipEnrollmentStatus } from "../enums/membership-enrollment.enums
 import { ApprovalDecision } from "../../schemes/enums/governance.enums";
 import {
   assertCanRecordEnrollmentApproval,
+  isEnrollmentExpiredWithoutApproval,
   resolveEnrollmentStatus,
   REQUIRED_ENROLLMENT_APPROVALS,
 } from "./membership-enrollment-workflow";
+import { MembershipEnrollmentResponseMapper } from "../mappers/membership-enrollment-response.mapper";
 import { TenantUser } from "../../identity/entities/tenant-user.entity";
 import { TenantUserRole } from "../../identity/entities/tenant-user-role.entity";
 import { Role } from "../../identity/entities/role.entity";
@@ -24,6 +26,12 @@ const INVITE_LINK_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 hours — see InviteLin
 // than day-to-day staff operations, matching the same tenant_admin/
 // treasurer convention already established for accounting_settings:update.
 const ENROLLMENT_APPROVER_ROLE_CODES = ["tenant_admin", "treasurer"];
+
+export interface JoinResult {
+  enrollmentId: string;
+  status: MembershipEnrollmentStatus;
+  tenantName: string;
+}
 
 @Injectable()
 export class MembershipEnrollmentService {
@@ -62,7 +70,6 @@ export class MembershipEnrollmentService {
   ): Promise<{ valid: boolean; tenantName?: string; reason?: string }> {
     const link = await this.dataSource.getRepository(InviteLink).findOne({
       where: { token },
-      relations: { generatedBy: true },
     });
 
     if (!link) {
@@ -82,7 +89,7 @@ export class MembershipEnrollmentService {
     return { valid: true, tenantName: tenant?.name ?? tenant?.slug };
   }
 
-  async acceptInvite(token: string, actorUserId: string): Promise<MembershipEnrollmentRequest> {
+  async acceptInvite(token: string, actorUserId: string): Promise<JoinResult> {
     return this.dataSource.transaction(async (manager) => {
       const link = await manager.findOne(InviteLink, {
         where: { token },
@@ -131,16 +138,44 @@ export class MembershipEnrollmentService {
       link.consumedAt = new Date();
       await manager.save(InviteLink, link);
 
-      return savedEnrollment;
+      const tenant = await manager.findOne(Tenant, { where: { id: link.tenantId } });
+
+      return {
+        enrollmentId: savedEnrollment.id,
+        status: savedEnrollment.status,
+        tenantName: tenant?.name ?? tenant?.slug ?? "the cooperative",
+      };
     });
   }
 
-  async listPendingEnrollments(tenantId: string): Promise<MembershipEnrollmentRequest[]> {
-    return this.dataSource.getRepository(MembershipEnrollmentRequest).find({
+  /**
+   * Staff-only — an applicant's name, contact details and approval trail
+   * are for the people deciding on them, not for every member. Returns a
+   * deliberately shaped response (see the mapper), and hides requests
+   * that have already lapsed with no approval, which only still exist
+   * because the hourly cleanup hasn't run yet.
+   */
+  async listPendingEnrollments(tenantId: string, actorUserId: string) {
+    const actor = await this.resolveEligibleActor(tenantId, actorUserId);
+
+    const rows = await this.dataSource.getRepository(MembershipEnrollmentRequest).find({
       where: { tenantId, status: MembershipEnrollmentStatus.PENDING_APPROVAL },
       relations: { user: true, approvals: { approver: { user: true } } },
       order: { createdAt: "ASC" },
     });
+
+    const now = new Date();
+
+    return rows
+      .filter(
+        (row) =>
+          !isEnrollmentExpiredWithoutApproval({
+            expiresAt: row.expiresAt,
+            decisions: (row.approvals ?? []).map((a) => a.decision),
+            now,
+          }),
+      )
+      .map((row) => MembershipEnrollmentResponseMapper.toResponse(row, actor.id));
   }
 
   async recordApproval(
@@ -148,7 +183,7 @@ export class MembershipEnrollmentService {
     enrollmentRequestId: string,
     actorUserId: string,
     decision: ApprovalDecision,
-  ): Promise<MembershipEnrollmentRequest> {
+  ): Promise<{ id: string; status: MembershipEnrollmentStatus }> {
     return this.dataSource.transaction(async (manager) => {
       const actor = await manager.findOne(TenantUser, {
         where: { tenantId, userId: actorUserId, isActive: true },
@@ -181,6 +216,18 @@ export class MembershipEnrollmentService {
         existingApproverIds,
         approverTenantUserId: actor.id,
       });
+
+      if (
+        isEnrollmentExpiredWithoutApproval({
+          expiresAt: enrollment.expiresAt,
+          decisions: (enrollment.approvals ?? []).map((a) => a.decision),
+          now: new Date(),
+        })
+      ) {
+        throw new BadRequestException(
+          "This enrollment request has expired. Ask for a new invite link.",
+        );
+      }
 
       const approval = manager.create(MembershipEnrollmentApproval, {
         enrollmentRequestId: enrollment.id,
@@ -222,7 +269,9 @@ export class MembershipEnrollmentService {
         await manager.save(TenantUserRole, roleAssignment);
       }
 
-      return manager.save(MembershipEnrollmentRequest, enrollment);
+      await manager.save(MembershipEnrollmentRequest, enrollment);
+
+      return { id: enrollment.id, status: newStatus };
     });
   }
 
@@ -286,7 +335,7 @@ export class MembershipEnrollmentService {
     );
 
     if (!isEligible) {
-      throw new ForbiddenException("Only an admin or treasurer can invite new members.");
+      throw new ForbiddenException("Only an admin or treasurer can do this.");
     }
 
     return actor;

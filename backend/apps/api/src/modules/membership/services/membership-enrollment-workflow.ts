@@ -60,3 +60,21 @@ export function resolveEnrollmentStatus(input: {
 
   return MembershipEnrollmentStatus.PENDING_APPROVAL;
 }
+
+/**
+ * An enrollment is "dead" once its invite window has passed with zero
+ * approvals — exactly the set the hourly cleanup deletes. Until that job
+ * next runs it still exists, and it must not be decidable or listed in
+ * the meantime: otherwise an admin could approve someone after the
+ * window closed simply because cleanup hadn't run yet. One approval is
+ * enough to keep an enrollment alive past expiry, matching the cleanup
+ * rule itself.
+ */
+export function isEnrollmentExpiredWithoutApproval(input: {
+  expiresAt: Date;
+  decisions: ApprovalDecision[];
+  now: Date;
+}): boolean {
+  const hasAnyApproval = input.decisions.includes(ApprovalDecision.APPROVED);
+  return input.expiresAt.getTime() < input.now.getTime() && !hasAnyApproval;
+}
