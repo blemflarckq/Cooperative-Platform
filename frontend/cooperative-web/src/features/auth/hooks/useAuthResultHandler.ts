@@ -101,6 +101,17 @@ export function useAuthResultHandler() {
       return;
     }
 
+    // They asked to join a cooperative and it hasn't been decided yet.
+    // Not a stranger with nowhere to go, so no "name your cooperative"
+    // detour — just a plain statement of where things stand.
+    if (result.status === "pending_enrollment") {
+      navigate("/pending-approval", {
+        replace: true,
+        state: { tenantName: result.tenantName },
+      });
+      return;
+    }
+
     const pendingInvite = readPendingInvite();
 
     if (!pendingInvite) {

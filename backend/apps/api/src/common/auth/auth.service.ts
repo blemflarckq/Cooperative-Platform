@@ -19,6 +19,9 @@ import { Role } from "../../modules/identity/entities/role.entity";
 import { bootstrapRolesForTenant } from "../../modules/identity/services/tenant-role-bootstrap";
 import { AccountingSettingsService } from "../../modules/accounting/services/accounting-settings.service";
 import { slugifyCode } from "../utils/code-generator";
+import { MembershipEnrollmentRequest } from "../../modules/membership/entities/membership-enrollment-request.entity";
+import { MembershipEnrollmentStatus } from "../../modules/membership/enums/membership-enrollment.enums";
+import { getEnrollmentLapse } from "../../modules/membership/services/membership-enrollment-workflow";
 import { hashPassword } from "../../common/auth/password";
 import { getRequiredEnv } from "../../config/env";
 import type { AuthJwtPayload } from "./jwt.types";
@@ -67,7 +70,8 @@ export interface TenantOption {
 export type AuthResult =
   | ({ status: "authenticated" } & LoginResponse)
   | { status: "select_tenant"; preAuthToken: string; tenants: TenantOption[] }
-  | { status: "no_tenant"; preAuthToken: string };
+  | { status: "no_tenant"; preAuthToken: string }
+  | { status: "pending_enrollment"; tenantName: string };
 
 const PRE_AUTH_TOKEN_TTL = "5m";
 
@@ -175,6 +179,15 @@ export class AuthService {
     );
 
     if (activeMemberships.length === 0) {
+      // Someone with a request still awaiting approval isn't a stranger
+      // with nowhere to go — sending them into "name your cooperative"
+      // would be wrong. No token is issued: there's nothing for them to
+      // do until the request is decided.
+      const pending = await this.findLivePendingEnrollment(user.id);
+      if (pending) {
+        return { status: "pending_enrollment", tenantName: pending.tenantName };
+      }
+
       const preAuthToken = await this.issuePreAuthToken(user.id);
       return { status: "no_tenant", preAuthToken };
     }
@@ -275,6 +288,36 @@ export class AuthService {
     }
 
     return payload.oauthResult as AuthResult;
+  }
+
+  /**
+   * The person's most recent enrollment request that's still genuinely
+   * live — "live" meaning not lapsed, using the same rule everything
+   * else uses, since a lapsed one lingers in the database until the
+   * hourly cleanup runs.
+   */
+  private async findLivePendingEnrollment(userId: string): Promise<{ tenantName: string } | null> {
+    const requests = await this.dataSource.getRepository(MembershipEnrollmentRequest).find({
+      where: { userId, status: MembershipEnrollmentStatus.PENDING_APPROVAL },
+      relations: { approvals: true },
+      order: { createdAt: "DESC" },
+    });
+
+    const now = new Date();
+    const live = requests.find(
+      (request) =>
+        getEnrollmentLapse({
+          createdAt: request.createdAt,
+          expiresAt: request.expiresAt,
+          decisions: (request.approvals ?? []).map((approval) => approval.decision),
+          now,
+        }) === "none",
+    );
+
+    if (!live) return null;
+
+    const tenant = await this.tenants.findOne({ where: { id: live.tenantId } });
+    return { tenantName: tenant?.name ?? tenant?.slug ?? "the cooperative" };
   }
 
   /**

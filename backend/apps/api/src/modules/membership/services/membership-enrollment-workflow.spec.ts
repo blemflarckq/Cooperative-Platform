@@ -3,7 +3,7 @@ import { ApprovalDecision } from '../../schemes/enums/governance.enums';
 import { MembershipEnrollmentStatus } from '../enums/membership-enrollment.enums';
 import {
   assertCanRecordEnrollmentApproval,
-  isEnrollmentExpiredWithoutApproval,
+  getEnrollmentLapse,
   resolveEnrollmentStatus,
   RecordEnrollmentApprovalInput,
   REQUIRED_ENROLLMENT_APPROVALS,
@@ -26,6 +26,15 @@ describe('assertCanRecordEnrollmentApproval', () => {
       assertCanRecordEnrollmentApproval({
         ...baseInput,
         requestStatus: MembershipEnrollmentStatus.APPROVED,
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects a decision on an expired enrollment', () => {
+    expect(() =>
+      assertCanRecordEnrollmentApproval({
+        ...baseInput,
+        requestStatus: MembershipEnrollmentStatus.EXPIRED,
       }),
     ).toThrow(BadRequestException);
   });
@@ -84,36 +93,67 @@ describe('resolveEnrollmentStatus', () => {
   });
 });
 
-describe('isEnrollmentExpiredWithoutApproval', () => {
-  const now = new Date('2026-10-01T12:00:00Z');
-  const past = new Date('2026-10-01T08:00:00Z');
-  const future = new Date('2026-10-01T16:00:00Z');
+describe('getEnrollmentLapse', () => {
+  const HOUR = 60 * 60 * 1000;
+  const now = new Date('2026-10-10T12:00:00Z');
+  const hoursAgo = (h: number) => new Date(now.getTime() - h * HOUR);
+  const hoursFromNow = (h: number) => new Date(now.getTime() + h * HOUR);
 
-  it('is not expired while the window is still open', () => {
-    expect(isEnrollmentExpiredWithoutApproval({ expiresAt: future, decisions: [], now })).toBe(false);
-  });
-
-  it('is expired once the window has passed with no approvals', () => {
-    expect(isEnrollmentExpiredWithoutApproval({ expiresAt: past, decisions: [], now })).toBe(true);
-  });
-
-  it('stays alive past the window if it has at least one approval', () => {
+  it('is live while the invite window is open and nobody has approved', () => {
     expect(
-      isEnrollmentExpiredWithoutApproval({
-        expiresAt: past,
-        decisions: [ApprovalDecision.APPROVED],
-        now,
-      }),
-    ).toBe(false);
+      getEnrollmentLapse({ createdAt: hoursAgo(1), expiresAt: hoursFromNow(3), decisions: [], now }),
+    ).toBe('none');
   });
 
-  it('a rejection alone does not keep an expired enrollment alive', () => {
+  it('with no approvals, lapses the moment the invite window closes', () => {
     expect(
-      isEnrollmentExpiredWithoutApproval({
-        expiresAt: past,
+      getEnrollmentLapse({ createdAt: hoursAgo(5), expiresAt: hoursAgo(1), decisions: [], now }),
+    ).toBe('no_approval_window_passed');
+  });
+
+  it('a rejection alone does not keep a lapsed enrollment alive', () => {
+    expect(
+      getEnrollmentLapse({
+        createdAt: hoursAgo(5),
+        expiresAt: hoursAgo(1),
         decisions: [ApprovalDecision.REJECTED],
         now,
       }),
-    ).toBe(true);
+    ).toBe('no_approval_window_passed');
+  });
+
+  it('one approval keeps it alive past the invite window, up to 2 days', () => {
+    expect(
+      getEnrollmentLapse({
+        createdAt: hoursAgo(30),
+        expiresAt: hoursAgo(26),
+        decisions: [ApprovalDecision.APPROVED],
+        now,
+      }),
+    ).toBe('none');
+  });
+
+  it('one approval but no second one after 2 days is overdue', () => {
+    expect(
+      getEnrollmentLapse({
+        createdAt: hoursAgo(49),
+        expiresAt: hoursAgo(45),
+        decisions: [ApprovalDecision.APPROVED],
+        now,
+      }),
+    ).toBe('second_approval_overdue');
+  });
+
+  it('honours a different policy — the limits are data, not constants', () => {
+    const strict = { inviteLinkLifetimeMs: 4 * HOUR, partialApprovalLifetimeMs: 6 * HOUR };
+    expect(
+      getEnrollmentLapse({
+        createdAt: hoursAgo(7),
+        expiresAt: hoursAgo(3),
+        decisions: [ApprovalDecision.APPROVED],
+        now,
+        policy: strict,
+      }),
+    ).toBe('second_approval_overdue');
   });
 });

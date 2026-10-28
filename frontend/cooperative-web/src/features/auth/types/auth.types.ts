@@ -39,7 +39,8 @@ export interface TenantOption {
 export type AuthResult =
   | ({ status: "authenticated" } & LoginResponse)
   | { status: "select_tenant"; preAuthToken: string; tenants: TenantOption[] }
-  | { status: "no_tenant"; preAuthToken: string };
+  | { status: "no_tenant"; preAuthToken: string }
+  | { status: "pending_enrollment"; tenantName: string };
 
 export interface SelectTenantRequest {
   preAuthToken: string;

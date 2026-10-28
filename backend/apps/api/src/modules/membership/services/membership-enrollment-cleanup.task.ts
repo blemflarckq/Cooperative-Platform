@@ -24,10 +24,13 @@ export class MembershipEnrollmentCleanupTask {
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleCleanup(): Promise<void> {
-    const { deletedInviteLinks } = await this.enrollmentService.cleanupExpiredEnrollments();
+    const { deletedInviteLinks, expiredEnrollments } =
+      await this.enrollmentService.cleanupExpiredEnrollments();
 
-    if (deletedInviteLinks > 0) {
-      this.logger.log(`Cleaned up ${deletedInviteLinks} expired invite link(s).`);
+    if (deletedInviteLinks > 0 || expiredEnrollments > 0) {
+      this.logger.log(
+        `Cleaned up ${deletedInviteLinks} expired invite link(s); expired ${expiredEnrollments} enrollment(s) awaiting a second approval.`,
+      );
     }
   }
 }

@@ -19,6 +19,27 @@ import { MembershipEnrollmentStatus } from "../enums/membership-enrollment.enums
  */
 export const REQUIRED_ENROLLMENT_APPROVALS = 2;
 
+/**
+ * Every time limit in the enrollment flow, in one place. These are
+ * deliberately plain data, passed to the pure functions below rather
+ * than read from module constants inside them — so making them
+ * per-cooperative settings later means changing where the policy comes
+ * from, not rewriting any logic.
+ */
+export interface EnrollmentExpiryPolicy {
+  /** How long an invite link lives — and how long an enrollment with no
+   * approvals at all is allowed to wait. */
+  inviteLinkLifetimeMs: number;
+  /** How long an enrollment that already has one approval may wait for
+   * the second, counted from when the person followed the link. */
+  partialApprovalLifetimeMs: number;
+}
+
+export const DEFAULT_ENROLLMENT_EXPIRY_POLICY: EnrollmentExpiryPolicy = {
+  inviteLinkLifetimeMs: 4 * 60 * 60 * 1000, // 4 hours
+  partialApprovalLifetimeMs: 2 * 24 * 60 * 60 * 1000, // 2 days
+};
+
 export interface RecordEnrollmentApprovalInput {
   requestStatus: MembershipEnrollmentStatus;
   isEligibleApprover: boolean;
@@ -62,19 +83,36 @@ export function resolveEnrollmentStatus(input: {
 }
 
 /**
- * An enrollment is "dead" once its invite window has passed with zero
- * approvals — exactly the set the hourly cleanup deletes. Until that job
- * next runs it still exists, and it must not be decidable or listed in
- * the meantime: otherwise an admin could approve someone after the
- * window closed simply because cleanup hadn't run yet. One approval is
- * enough to keep an enrollment alive past expiry, matching the cleanup
- * rule itself.
+ * - "none": still live.
+ * - "no_approval_window_passed": the invite window closed and nobody
+ *   approved — this is what the hourly job deletes outright.
+ * - "second_approval_overdue": it has one approval but the second never
+ *   came within the policy's allowance — the job marks it EXPIRED.
+ *
+ * A lapsed request still exists in the database until the job next runs,
+ * so everything user-facing (the approvers' list, deciding, the
+ * applicant's own sign-in) must treat anything other than "none" as
+ * already gone, rather than waiting for cleanup.
  */
-export function isEnrollmentExpiredWithoutApproval(input: {
+export type EnrollmentLapse =
+  | "none"
+  | "no_approval_window_passed"
+  | "second_approval_overdue";
+
+export function getEnrollmentLapse(input: {
+  createdAt: Date;
   expiresAt: Date;
   decisions: ApprovalDecision[];
   now: Date;
-}): boolean {
-  const hasAnyApproval = input.decisions.includes(ApprovalDecision.APPROVED);
-  return input.expiresAt.getTime() < input.now.getTime() && !hasAnyApproval;
+  policy?: EnrollmentExpiryPolicy;
+}): EnrollmentLapse {
+  const policy = input.policy ?? DEFAULT_ENROLLMENT_EXPIRY_POLICY;
+  const hasApproval = input.decisions.includes(ApprovalDecision.APPROVED);
+
+  if (!hasApproval) {
+    return input.expiresAt.getTime() < input.now.getTime() ? "no_approval_window_passed" : "none";
+  }
+
+  const overdueAt = input.createdAt.getTime() + policy.partialApprovalLifetimeMs;
+  return overdueAt < input.now.getTime() ? "second_approval_overdue" : "none";
 }

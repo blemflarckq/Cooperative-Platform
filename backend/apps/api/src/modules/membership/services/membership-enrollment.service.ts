@@ -8,7 +8,8 @@ import { MembershipEnrollmentStatus } from "../enums/membership-enrollment.enums
 import { ApprovalDecision } from "../../schemes/enums/governance.enums";
 import {
   assertCanRecordEnrollmentApproval,
-  isEnrollmentExpiredWithoutApproval,
+  DEFAULT_ENROLLMENT_EXPIRY_POLICY,
+  getEnrollmentLapse,
   resolveEnrollmentStatus,
   REQUIRED_ENROLLMENT_APPROVALS,
 } from "./membership-enrollment-workflow";
@@ -18,7 +19,8 @@ import { TenantUserRole } from "../../identity/entities/tenant-user-role.entity"
 import { Role } from "../../identity/entities/role.entity";
 import { Tenant } from "../../identity/entities/tenant.entity";
 
-const INVITE_LINK_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 hours — see InviteLink entity for why.
+// Every time limit lives in DEFAULT_ENROLLMENT_EXPIRY_POLICY (see the workflow
+// file) — this service reads the policy rather than owning any constants.
 
 // Deliberately its own explicit constant, not a reuse of the broader
 // STAFF_ROLE_CODES list used elsewhere (which also includes secretary) —
@@ -44,7 +46,7 @@ export class MembershipEnrollmentService {
     const actor = await this.resolveEligibleActor(tenantId, actorUserId);
 
     const token = randomBytes(24).toString("hex");
-    const expiresAt = new Date(Date.now() + INVITE_LINK_LIFETIME_MS);
+    const expiresAt = new Date(Date.now() + DEFAULT_ENROLLMENT_EXPIRY_POLICY.inviteLinkLifetimeMs);
 
     const link = this.dataSource.getRepository(InviteLink).create({
       tenantId,
@@ -113,13 +115,26 @@ export class MembershipEnrollmentService {
         throw new BadRequestException("You're already a member of this cooperative.");
       }
 
-      const existingPending = await manager.findOne(MembershipEnrollmentRequest, {
+      const pendingForUser = await manager.find(MembershipEnrollmentRequest, {
         where: {
           tenantId: link.tenantId,
           userId: actorUserId,
           status: MembershipEnrollmentStatus.PENDING_APPROVAL,
         },
+        relations: { approvals: true },
       });
+      // One that has already lapsed only still exists because the hourly
+      // cleanup hasn't run yet — it must not block a fresh attempt.
+      const nowForCheck = new Date();
+      const existingPending = pendingForUser.some(
+        (request) =>
+          getEnrollmentLapse({
+            createdAt: request.createdAt,
+            expiresAt: request.expiresAt,
+            decisions: (request.approvals ?? []).map((a) => a.decision),
+            now: nowForCheck,
+          }) === "none",
+      );
       if (existingPending) {
         throw new BadRequestException(
           "You already have an enrollment request awaiting approval for this cooperative.",
@@ -169,11 +184,12 @@ export class MembershipEnrollmentService {
     return rows
       .filter(
         (row) =>
-          !isEnrollmentExpiredWithoutApproval({
+          getEnrollmentLapse({
+            createdAt: row.createdAt,
             expiresAt: row.expiresAt,
             decisions: (row.approvals ?? []).map((a) => a.decision),
             now,
-          }),
+          }) === "none",
       )
       .map((row) => MembershipEnrollmentResponseMapper.toResponse(row, actor.id));
   }
@@ -198,9 +214,13 @@ export class MembershipEnrollmentService {
         ENROLLMENT_APPROVER_ROLE_CODES.includes(assignment.role.code),
       );
 
+      // Lock the request row ALONE. Loading its approvals in the same query
+      // makes TypeORM left-join them, and Postgres refuses FOR UPDATE on
+      // the nullable side of an outer join — which made every approval
+      // attempt fail. Approvals are read separately, after the lock is
+      // held, so a concurrent decision still can't interleave.
       const enrollment = await manager.findOne(MembershipEnrollmentRequest, {
         where: { id: enrollmentRequestId, tenantId },
-        relations: { approvals: true },
         lock: { mode: "pessimistic_write" },
       });
 
@@ -208,7 +228,11 @@ export class MembershipEnrollmentService {
         throw new NotFoundException("Enrollment request not found.");
       }
 
-      const existingApproverIds = enrollment.approvals?.map((a) => a.approverTenantUserId) ?? [];
+      const existingApprovals = await manager.find(MembershipEnrollmentApproval, {
+        where: { enrollmentRequestId: enrollment.id },
+      });
+
+      const existingApproverIds = existingApprovals.map((a) => a.approverTenantUserId);
 
       assertCanRecordEnrollmentApproval({
         requestStatus: enrollment.status,
@@ -218,11 +242,12 @@ export class MembershipEnrollmentService {
       });
 
       if (
-        isEnrollmentExpiredWithoutApproval({
+        getEnrollmentLapse({
+          createdAt: enrollment.createdAt,
           expiresAt: enrollment.expiresAt,
-          decisions: (enrollment.approvals ?? []).map((a) => a.decision),
+          decisions: existingApprovals.map((a) => a.decision),
           now: new Date(),
-        })
+        }) !== "none"
       ) {
         throw new BadRequestException(
           "This enrollment request has expired. Ask for a new invite link.",
@@ -237,10 +262,7 @@ export class MembershipEnrollmentService {
       });
       await manager.save(MembershipEnrollmentApproval, approval);
 
-      const allDecisions = [
-        ...(enrollment.approvals?.map((a) => a.decision) ?? []),
-        decision,
-      ];
+      const allDecisions = [...existingApprovals.map((a) => a.decision), decision];
       const newStatus = resolveEnrollmentStatus({
         decisions: allDecisions,
         requiredApprovals: REQUIRED_ENROLLMENT_APPROVALS,
@@ -276,19 +298,25 @@ export class MembershipEnrollmentService {
   }
 
   /**
-   * The scheduled cleanup job's target. Deliberately narrow, per the
-   * explicit rule: only enrollments with ZERO approvals get removed once
-   * their invite link's 4-hour window has passed. Anything that got even
-   * one approval — real signal that a human vouched for this person —
-   * is left alone rather than silently deleted, even though it hasn't
-   * reached the full two required. Deleting the InviteLink is enough:
-   * both MembershipEnrollmentRequest and its approvals cascade-delete
-   * from there, since both relations are configured with onDelete:
-   * CASCADE back to the link they descend from.
+   * The scheduled cleanup job's target. Two different outcomes, per the
+   * rules we agreed:
+   *
+   * - Never approved by anyone, invite window passed: removed outright.
+   *   Nobody vouched for them, and deleting the InviteLink is enough —
+   *   the enrollment and its approvals cascade-delete from it.
+   * - Approved once but the second approval never came in time: marked
+   *   EXPIRED, not deleted. A person did vouch for this applicant, so
+   *   the record of who approved what is worth keeping, and the
+   *   applicant can simply start over with a new invite link.
+   *
+   * Lapsed requests are already invisible and undecidable the moment
+   * they lapse (see getEnrollmentLapse); this job just tidies up behind
+   * that, so a delay in running it costs nothing but a few stray rows.
    */
-  async cleanupExpiredEnrollments(): Promise<{ deletedInviteLinks: number }> {
+  async cleanupExpiredEnrollments(): Promise<{ deletedInviteLinks: number; expiredEnrollments: number }> {
     const now = new Date();
     let deletedCount = 0;
+    let expiredCount = 0;
 
     // Links nobody ever followed — nothing depends on these at all.
     const expiredNeverFollowed = await this.dataSource.getRepository(InviteLink).find({
@@ -301,23 +329,44 @@ export class MembershipEnrollmentService {
       deletedCount += expiredNeverFollowed.length;
     }
 
-    // Links that WERE followed, whose resulting enrollment expired with
-    // zero approvals.
-    const expiredPending = await this.dataSource.getRepository(MembershipEnrollmentRequest).find({
+    // Followed links whose enrollment has lapsed. The invite window
+    // always closes before the longer partial-approval allowance does,
+    // so every candidate for either outcome has a passed expiresAt.
+    const candidates = await this.dataSource.getRepository(MembershipEnrollmentRequest).find({
       where: { status: MembershipEnrollmentStatus.PENDING_APPROVAL, expiresAt: LessThan(now) },
       relations: { approvals: true },
     });
 
-    const idsToDelete = expiredPending
-      .filter((request) => !(request.approvals ?? []).some((a) => a.decision === ApprovalDecision.APPROVED))
-      .map((request) => request.inviteLinkId);
+    const inviteLinkIdsToDelete: string[] = [];
+    const toExpire: MembershipEnrollmentRequest[] = [];
 
-    if (idsToDelete.length > 0) {
-      await this.dataSource.getRepository(InviteLink).delete(idsToDelete);
-      deletedCount += idsToDelete.length;
+    for (const request of candidates) {
+      const lapse = getEnrollmentLapse({
+        createdAt: request.createdAt,
+        expiresAt: request.expiresAt,
+        decisions: (request.approvals ?? []).map((a) => a.decision),
+        now,
+      });
+
+      if (lapse === "no_approval_window_passed") {
+        inviteLinkIdsToDelete.push(request.inviteLinkId);
+      } else if (lapse === "second_approval_overdue") {
+        request.status = MembershipEnrollmentStatus.EXPIRED;
+        toExpire.push(request);
+      }
     }
 
-    return { deletedInviteLinks: deletedCount };
+    if (inviteLinkIdsToDelete.length > 0) {
+      await this.dataSource.getRepository(InviteLink).delete(inviteLinkIdsToDelete);
+      deletedCount += inviteLinkIdsToDelete.length;
+    }
+
+    if (toExpire.length > 0) {
+      await this.dataSource.getRepository(MembershipEnrollmentRequest).save(toExpire);
+      expiredCount += toExpire.length;
+    }
+
+    return { deletedInviteLinks: deletedCount, expiredEnrollments: expiredCount };
   }
 
   private async resolveEligibleActor(tenantId: string, actorUserId: string): Promise<TenantUser> {

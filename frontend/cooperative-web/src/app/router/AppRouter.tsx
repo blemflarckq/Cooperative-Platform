@@ -13,6 +13,7 @@ import { MemberDashboardPage } from "@/features/dashboard/pages/MemberDashboardP
 import { AdminDashboardPage } from "@/features/dashboard/pages/AdminDashboardPage";
 import { MembersPage } from "@/features/tenant-users/pages/MembersPage";
 import { JoinPage } from "@/features/membership/pages/JoinPage";
+import { PendingApprovalPage } from "@/features/membership/pages/PendingApprovalPage";
 import { CreateTenantUserPage } from "@/features/tenant-users/pages/CreateTenantUserPage";
 import { TenantUserDetailsPage } from "@/features/tenant-users/pages/TenantUserDetailsPage";
 import { EditTenantUserPage } from "@/features/tenant-users/pages/EditTenantUserPage";
@@ -83,6 +84,7 @@ export function AppRouter() {
         <Route path="/create-tenant" element={<CreateTenantPage />} />
         <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/join/:token" element={<JoinPage />} />
+        <Route path="/pending-approval" element={<PendingApprovalPage />} />
         <Route path="/reset-password" element={<ResetPasswordPlaceholderPage />} />
       </Route>
 
