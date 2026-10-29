@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomBytes } from "crypto";
-import { DataSource, IsNull, LessThan } from "typeorm";
+import { DataSource, EntityManager, IsNull, LessThan } from "typeorm";
 import { InviteLink } from "../entities/invite-link.entity";
 import { MembershipEnrollmentRequest } from "../entities/membership-enrollment-request.entity";
 import { MembershipEnrollmentApproval } from "../entities/membership-enrollment-approval.entity";
@@ -14,6 +14,7 @@ import {
   REQUIRED_ENROLLMENT_APPROVALS,
 } from "./membership-enrollment-workflow";
 import { MembershipEnrollmentResponseMapper } from "../mappers/membership-enrollment-response.mapper";
+import { MEMBERSHIP_PERMISSIONS } from "../membership.permissions";
 import { TenantUser } from "../../identity/entities/tenant-user.entity";
 import { TenantUserRole } from "../../identity/entities/tenant-user-role.entity";
 import { Role } from "../../identity/entities/role.entity";
@@ -22,12 +23,8 @@ import { Tenant } from "../../identity/entities/tenant.entity";
 // Every time limit lives in DEFAULT_ENROLLMENT_EXPIRY_POLICY (see the workflow
 // file) — this service reads the policy rather than owning any constants.
 
-// Deliberately its own explicit constant, not a reuse of the broader
-// STAFF_ROLE_CODES list used elsewhere (which also includes secretary) —
-// deciding who gets into the cooperative at all is a narrower question
-// than day-to-day staff operations, matching the same tenant_admin/
-// treasurer convention already established for accounting_settings:update.
-const ENROLLMENT_APPROVER_ROLE_CODES = ["tenant_admin", "treasurer"];
+// Who may do what is decided by the membership:invite and membership:approve
+// permissions (see membership.permissions.ts) — not by role names in this file.
 
 export interface JoinResult {
   enrollmentId: string;
@@ -43,7 +40,12 @@ export class MembershipEnrollmentService {
     tenantId: string,
     actorUserId: string,
   ): Promise<{ token: string; expiresAt: Date }> {
-    const actor = await this.resolveEligibleActor(tenantId, actorUserId);
+    const actor = await this.requirePermission(
+      tenantId,
+      actorUserId,
+      MEMBERSHIP_PERMISSIONS.INVITE,
+      "You don't have permission to invite new members.",
+    );
 
     const token = randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + DEFAULT_ENROLLMENT_EXPIRY_POLICY.inviteLinkLifetimeMs);
@@ -171,7 +173,12 @@ export class MembershipEnrollmentService {
    * because the hourly cleanup hasn't run yet.
    */
   async listPendingEnrollments(tenantId: string, actorUserId: string) {
-    const actor = await this.resolveEligibleActor(tenantId, actorUserId);
+    const actor = await this.requirePermission(
+      tenantId,
+      actorUserId,
+      MEMBERSHIP_PERMISSIONS.APPROVE,
+      "You don't have permission to see requests to join.",
+    );
 
     const rows = await this.dataSource.getRepository(MembershipEnrollmentRequest).find({
       where: { tenantId, status: MembershipEnrollmentStatus.PENDING_APPROVAL },
@@ -201,18 +208,8 @@ export class MembershipEnrollmentService {
     decision: ApprovalDecision,
   ): Promise<{ id: string; status: MembershipEnrollmentStatus }> {
     return this.dataSource.transaction(async (manager) => {
-      const actor = await manager.findOne(TenantUser, {
-        where: { tenantId, userId: actorUserId, isActive: true },
-        relations: { roles: { role: true } },
-      });
-
-      if (!actor) {
-        throw new ForbiddenException("You are not an active member of this tenant.");
-      }
-
-      const isEligibleApprover = actor.roles.some((assignment) =>
-        ENROLLMENT_APPROVER_ROLE_CODES.includes(assignment.role.code),
-      );
+      const { actor, permissions } = await this.loadActor(manager, tenantId, actorUserId);
+      const isEligibleApprover = permissions.has(MEMBERSHIP_PERMISSIONS.APPROVE);
 
       // Lock the request row ALONE. Loading its approvals in the same query
       // makes TypeORM left-join them, and Postgres refuses FOR UPDATE on
@@ -369,22 +366,47 @@ export class MembershipEnrollmentService {
     return { deletedInviteLinks: deletedCount, expiredEnrollments: expiredCount };
   }
 
-  private async resolveEligibleActor(tenantId: string, actorUserId: string): Promise<TenantUser> {
-    const actor = await this.dataSource.getRepository(TenantUser).findOne({
+  /**
+   * The actor and the permissions their roles grant RIGHT NOW, read from
+   * the database rather than trusted from the sign-in token. The route
+   * guard already checks the token's claims; this is the authoritative
+   * second check, so taking a permission away from a role takes effect
+   * on the next action instead of whenever the person's session next
+   * refreshes.
+   */
+  private async loadActor(
+    manager: EntityManager,
+    tenantId: string,
+    actorUserId: string,
+  ): Promise<{ actor: TenantUser; permissions: Set<string> }> {
+    const actor = await manager.findOne(TenantUser, {
       where: { tenantId, userId: actorUserId, isActive: true },
-      relations: { roles: { role: true } },
+      relations: { roles: { role: { rolePermissions: { permission: true } } } },
     });
 
     if (!actor) {
       throw new ForbiddenException("You are not an active member of this tenant.");
     }
 
-    const isEligible = actor.roles.some((assignment) =>
-      ENROLLMENT_APPROVER_ROLE_CODES.includes(assignment.role.code),
+    const permissions = new Set(
+      actor.roles.flatMap((assignment) =>
+        (assignment.role.rolePermissions ?? []).map((grant) => grant.permission.code),
+      ),
     );
 
-    if (!isEligible) {
-      throw new ForbiddenException("Only an admin or treasurer can do this.");
+    return { actor, permissions };
+  }
+
+  private async requirePermission(
+    tenantId: string,
+    actorUserId: string,
+    permission: string,
+    message: string,
+  ): Promise<TenantUser> {
+    const { actor, permissions } = await this.loadActor(this.dataSource.manager, tenantId, actorUserId);
+
+    if (!permissions.has(permission)) {
+      throw new ForbiddenException(message);
     }
 
     return actor;

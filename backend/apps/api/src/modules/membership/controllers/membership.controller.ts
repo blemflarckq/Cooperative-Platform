@@ -3,6 +3,8 @@ import { TenantId } from "../../../common/tenancy/tenant-id.decorator";
 import { CurrentUser } from "../../../common/auth/current-user.decorator";
 import { Public } from "../../../common/auth/public.decorator";
 import { SkipTenantCheck } from "../../../common/tenancy/skip-tenant-check.decorator";
+import { RequirePermissions } from "../../../common/rbac/require-permissions.decorator";
+import { MEMBERSHIP_PERMISSIONS } from "../membership.permissions";
 import { AuthService } from "../../../common/auth/auth.service";
 import { MembershipEnrollmentService } from "../services/membership-enrollment.service";
 import { RecordEnrollmentDecisionDto } from "../dto/record-enrollment-decision.dto";
@@ -15,8 +17,9 @@ export class MembershipController {
     private readonly auth: AuthService,
   ) {}
 
-  /** Staff-only, enforced inside the service (tenant_admin/treasurer). */
+  /** The guard checks the signed-in token; the service re-checks against the database. */
   @Post("invite-links")
+  @RequirePermissions(MEMBERSHIP_PERMISSIONS.INVITE)
   async generateInviteLink(
     @TenantId() tenantId: string,
     @CurrentUser("sub") actorUserId: string,
@@ -65,6 +68,7 @@ export class MembershipController {
   }
 
   @Get("enrollments/pending")
+  @RequirePermissions(MEMBERSHIP_PERMISSIONS.APPROVE)
   async listPendingEnrollments(
     @TenantId() tenantId: string,
     @CurrentUser("sub") actorUserId: string,
@@ -73,6 +77,7 @@ export class MembershipController {
   }
 
   @Post("enrollments/:id/decision")
+  @RequirePermissions(MEMBERSHIP_PERMISSIONS.APPROVE)
   async recordDecision(
     @TenantId() tenantId: string,
     @Param("id") enrollmentRequestId: string,

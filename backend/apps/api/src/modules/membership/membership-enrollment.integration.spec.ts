@@ -41,7 +41,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
   let tenantUsersService: any;
   let Mapper: any;
   let TenantUser: any, TenantUserRole: any, Role: any, MembershipEnrollmentRequest: any, InviteLink: any;
-  let Loan: any, schedule: any;
+  let Loan: any, schedule: any, Permission: any, RolePermission: any;
 
   let tenantId: string;
   let admin: any, treasurer: any, plainMember: any;
@@ -77,6 +77,9 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     ({ MembershipEnrollmentRequest } = require('./entities/membership-enrollment-request.entity'));
     ({ InviteLink } = require('./entities/invite-link.entity'));
     ({ Loan } = require('../loans/entities/loan.entity'));
+    ({ Permission } = require('../identity/entities/permission.entity'));
+    ({ RolePermission } = require('../identity/entities/role-permission.entity'));
+    const { seedPermissions } = require('../../seed/permissions.seed');
     const { LoansModule } = require('../loans/loans.module');
     const { LoanRateScheduleService } = require('../loans/services/loan-rate-schedule.service');
 
@@ -97,6 +100,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     }).compile();
 
     ds = moduleRef.get(DataSource);
+    await seedPermissions(ds);
     auth = moduleRef.get(AuthService, { strict: false });
     enrollment = moduleRef.get(MembershipEnrollmentService, { strict: false });
     tenantUsersService = moduleRef.get(TenantUsersService, { strict: false });
@@ -135,7 +139,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     const link = await enrollment.generateInviteLink(tenantId, admin.userId);
     state.token = link.token;
     expect((await enrollment.getInviteLinkPreview(link.token))).toMatchObject({ valid: true, tenantName: 'Bohale Test Coop' });
-    await expect(enrollment.generateInviteLink(tenantId, state.plainUserId)).rejects.toThrow(/admin or treasurer/);
+    await expect(enrollment.generateInviteLink(tenantId, state.plainUserId)).rejects.toThrow(/permission/);
   });
 
   it('the invitee joins using only a pre-auth token → request pending', async () => {
@@ -163,7 +167,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
   });
 
   it('a plain member cannot list the queue or decide', async () => {
-    await expect(enrollment.listPendingEnrollments(tenantId, state.plainUserId)).rejects.toThrow(/admin or treasurer/);
+    await expect(enrollment.listPendingEnrollments(tenantId, state.plainUserId)).rejects.toThrow(/permission/);
     await expect(enrollment.recordApproval(tenantId, state.enrollmentId, state.plainUserId, 'APPROVED')).rejects.toThrow();
   });
 
@@ -344,5 +348,54 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     // And a later run must not re-stamp when an already-flagged loan became at risk.
     await schedule.applyDueRates(new Date('2026-11-24T08:00:00Z'));
     expect((await get(L.periodsCutoffFlag)).flaggedAtRiskAt.toISOString()).toBe(NOW.toISOString());
+  });
+
+  it('PERMISSIONS ARE SEPARATE — a role granted only "invite" can invite, but can neither see the queue nor decide', async () => {
+    const sec = await reg('secretaryone');
+    const secUser = await auth.loadUserFromPreAuthToken(sec.preAuthToken);
+    await addStaff(secUser.id, 'secretary');
+    const secretaryRole = await ds.getRepository(Role).findOneOrFail({ where: { tenantId, code: 'secretary' } });
+    const invitePerm = await ds.getRepository(Permission).findOneOrFail({ where: { code: 'membership:invite' } });
+
+    // out of the box a secretary holds neither
+    await expect(enrollment.generateInviteLink(tenantId, secUser.id)).rejects.toThrow(/permission/);
+
+    await ds.getRepository(RolePermission).save(
+      ds.getRepository(RolePermission).create({ roleId: secretaryRole.id, permissionId: invitePerm.id }),
+    );
+
+    const link = await enrollment.generateInviteLink(tenantId, secUser.id);
+    expect(link.token).toEqual(expect.any(String));
+    await expect(enrollment.listPendingEnrollments(tenantId, secUser.id)).rejects.toThrow(/permission/);
+
+    const mia = await reg('mia');
+    const miaUser = await auth.loadUserFromPreAuthToken(mia.preAuthToken);
+    await enrollment.acceptInvite(link.token, miaUser.id);
+    const queue = await enrollment.listPendingEnrollments(tenantId, admin.userId);
+    const miaRequest = queue.find((q: any) => q.applicant.fullName.startsWith('mia'));
+    await expect(enrollment.recordApproval(tenantId, miaRequest.id, secUser.id, 'APPROVED')).rejects.toThrow(/permission/);
+  });
+
+  it('PERMISSIONS — taking one away takes effect on the very next action, not at the next sign-in', async () => {
+    const treasurerRole = await ds.getRepository(Role).findOneOrFail({ where: { tenantId, code: 'treasurer' } });
+    const approvePerm = await ds.getRepository(Permission).findOneOrFail({ where: { code: 'membership:approve' } });
+    const grants = ds.getRepository(RolePermission);
+    const grant = await grants.findOneOrFail({ where: { roleId: treasurerRole.id, permissionId: approvePerm.id } });
+
+    await expect(enrollment.listPendingEnrollments(tenantId, treasurer.userId)).resolves.toBeDefined();
+    await grants.delete({ id: grant.id });
+    await expect(enrollment.listPendingEnrollments(tenantId, treasurer.userId)).rejects.toThrow(/permission/);
+    await grants.save(grants.create({ roleId: treasurerRole.id, permissionId: approvePerm.id }));
+    await expect(enrollment.listPendingEnrollments(tenantId, treasurer.userId)).resolves.toBeDefined();
+  });
+
+  it('the permissions reach the sign-in token — the thing the route guard and the screens actually read', async () => {
+    const asTreasurer = await auth.login({ email: email('treasurer'), password: PASSWORD });
+    expect(asTreasurer.status).toBe('authenticated');
+    expect(asTreasurer.user.permissions).toEqual(expect.arrayContaining(['membership:invite', 'membership:approve']));
+
+    const asMember = await auth.login({ email: email('plainmember'), password: PASSWORD });
+    expect(asMember.user.permissions).not.toContain('membership:invite');
+    expect(asMember.user.permissions).not.toContain('membership:approve');
   });
 });

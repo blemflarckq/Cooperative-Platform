@@ -205,6 +205,17 @@ const PERMISSIONS: Array<{
   },
 
   // =========================
+  // MEMBERSHIP (joining the cooperative)
+  // =========================
+  {
+    resource: "membership",
+    actions: [
+      { action: "invite", description: "Create invite links for people to join the cooperative" },
+      { action: "approve", description: "See and decide on requests to join the cooperative" },
+    ],
+  },
+
+  // =========================
   // PAYMENT ALLOCATION
   // =========================
   {

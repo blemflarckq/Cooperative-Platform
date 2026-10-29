@@ -58,7 +58,7 @@ export function assertCanRecordEnrollmentApproval(input: RecordEnrollmentApprova
 
   if (!input.isEligibleApprover) {
     throw new BadRequestException(
-      "Only an admin or treasurer can decide on new member enrollment.",
+      "You don't have permission to decide on new member requests.",
     );
   }
 }
