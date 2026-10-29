@@ -80,3 +80,8 @@ export interface RefreshTokenResponse {
   accessToken: string;
   refreshToken: string;
 }
+
+export interface SwitchTenantRequest {
+  refreshToken: string;
+  tenantId: string;
+}

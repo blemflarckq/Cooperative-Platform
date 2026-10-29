@@ -461,7 +461,15 @@ export class AuthService {
     return candidate;
   }
 
-  async refresh(refreshToken: string): Promise<LoginResponse> {
+  /**
+   * Proves a refresh token is genuine and still belongs to an active
+   * person. Shared by refresh (stay in the same cooperative) and
+   * switchTenant (move to another one) — both must be backed by the
+   * long-lived credential, never just a short-lived access token.
+   */
+  private async loadUserFromRefreshToken(
+    refreshToken: string,
+  ): Promise<{ user: User; currentTenantId: string }> {
     let payload: AuthJwtPayload;
 
     try {
@@ -487,9 +495,15 @@ export class AuthService {
       throw new UnauthorizedException("User account is inactive or no longer exists");
     }
 
+    return { user, currentTenantId: payload.tenantId };
+  }
+
+  async refresh(refreshToken: string): Promise<LoginResponse> {
+    const { user, currentTenantId } = await this.loadUserFromRefreshToken(refreshToken);
+
     const tenant = await this.tenants.findOne({
       where: {
-        id: payload.tenantId,
+        id: currentTenantId,
         isActive: true,
       },
     });
@@ -499,6 +513,51 @@ export class AuthService {
     }
 
     return this.buildLoginResponse(user, tenant);
+  }
+
+  /**
+   * Every cooperative this person is currently an active member of —
+   * what the in-app switcher offers. Read fresh each time, so a
+   * cooperative they were just admitted to appears without signing out.
+   */
+  async listMyTenants(userId: string): Promise<TenantOption[]> {
+    const memberships = await this.tenantUsers.find({
+      where: { userId, isActive: true },
+      relations: { tenant: true },
+    });
+
+    return memberships
+      .filter((membership) => membership.tenant?.isActive)
+      .map((membership) => ({
+        id: membership.tenant.id,
+        name: membership.tenant.name ?? membership.tenant.slug,
+        slug: membership.tenant.slug,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Moves a signed-in person to another cooperative they belong to,
+   * without signing out. Deliberately backed by the REFRESH token, not
+   * the short-lived access token: this issues a fresh long-lived session
+   * for a different cooperative, so it must demand the same long-lived
+   * credential that refreshing does. Otherwise anyone who briefly got
+   * hold of a 15-minute access token could turn it into a 30-day
+   * session in every cooperative the person belongs to.
+   */
+  async switchTenant(refreshToken: string, tenantId: string): Promise<LoginResponse> {
+    const { user } = await this.loadUserFromRefreshToken(refreshToken);
+
+    const membership = await this.tenantUsers.findOne({
+      where: { userId: user.id, tenantId, isActive: true },
+      relations: { tenant: true },
+    });
+
+    if (!membership || !membership.tenant?.isActive) {
+      throw new ForbiddenException("You do not belong to that cooperative.");
+    }
+
+    return this.buildLoginResponse(user, membership.tenant);
   }
 
   private async buildLoginResponse(

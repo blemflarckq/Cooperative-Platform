@@ -20,11 +20,11 @@ import { RoleChips } from "@/features/tenant-users/components/RoleChips";
 import { useTenantUsers } from "@/features/tenant-users/hooks/useTenantUsers";
 import type { TenantUserListItem } from "@/features/tenant-users/types/tenant-user.types";
 
-// Same two roles that approve enrollments on the backend (tenant_admin,
-// treasurer) — they're also the only ones holding this permission, which
-// is why it stands in for "can invite and approve" here, matching the
-// admin dashboard's gate.
-const INVITE_PERMISSION = ["accounting_settings:update"];
+// Two separate permissions, not one "admin" switch: who may invite and who
+// may decide on requests can be given out independently. Admin and
+// treasurer hold both by default. The backend enforces the same two.
+const INVITE_PERMISSION = ["membership:invite"];
+const APPROVE_PERMISSION = ["membership:approve"];
 
 /**
  * The people in the cooperative: who they are, how to recognise them
@@ -73,7 +73,7 @@ export function MembersPage() {
         }
       />
 
-      <PermissionGate permissions={INVITE_PERMISSION}>
+      <PermissionGate permissions={APPROVE_PERMISSION}>
         <PendingEnrollmentsSection />
       </PermissionGate>
 

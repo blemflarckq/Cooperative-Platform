@@ -81,6 +81,7 @@ apiClient.interceptors.response.use(
       "/auth/create-tenant",
       "/auth/oauth-complete",
       "/auth/refresh",
+      "/auth/switch-tenant",
     ];
     const isPreSessionRequest =
       PRE_SESSION_AUTH_PATHS.some((path) => originalRequest.url?.includes(path)) ||

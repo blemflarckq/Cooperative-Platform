@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ExperienceModeSwitcher } from "@/components/navigation/ExperienceModeSwitcher";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { CooperativeSwitcher } from "@/components/navigation/CooperativeSwitcher";
 
 /**
  * Top application header.
@@ -14,6 +15,15 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
  */
 interface AppHeaderProps {
   onOpenMobileNav: () => void;
+}
+
+function initials(fullName: string | undefined): string {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 }
 
 export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
@@ -55,9 +65,11 @@ export function AppHeader({ onOpenMobileNav }: AppHeaderProps) {
             <Bell className="size-4" />
           </button>
 
+          <CooperativeSwitcher />
+
           <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-white px-3 py-2">
             <div className="flex size-9 items-center justify-center rounded-full bg-[var(--primary)] text-sm font-semibold text-white">
-              KL
+              {initials(user?.fullName)}
             </div>
             <div className="hidden text-left sm:block">
               <p className="text-sm font-medium text-[var(--foreground)]">

@@ -398,4 +398,46 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     expect(asMember.user.permissions).not.toContain('membership:invite');
     expect(asMember.user.permissions).not.toContain('membership:approve');
   });
+
+  it('COOPERATIVE SWITCHER — lists every cooperative, switches on the refresh token, and each session carries the TARGET cooperative\'s own roles', async () => {
+    const mine = await auth.login({ email: email('xavier'), password: PASSWORD });
+    expect(mine.status).toBe('select_tenant');
+    const xavierCoop = mine.tenants.find((t: any) => t.name === 'Xavier Coop');
+    const bohale = mine.tenants.find((t: any) => t.name === 'Bohale Test Coop');
+    const inXavier = await auth.selectTenant(mine.preAuthToken, xavierCoop.id);
+
+    expect((await auth.listMyTenants(inXavier.user.id)).map((t: any) => t.name)).toEqual(['Bohale Test Coop', 'Xavier Coop']);
+
+    const inBohale = await auth.switchTenant(inXavier.refreshToken, bohale.id);
+    expect(inBohale.user.tenantName).toBe('Bohale Test Coop');
+    expect(inBohale.user.roles).toEqual(['Member']);
+    expect(inBohale.user.permissions).not.toContain('membership:approve'); // a member THERE, however powerful elsewhere
+
+    const back = await auth.switchTenant(inBohale.refreshToken, xavierCoop.id);
+    expect(back.user.tenantName).toBe('Xavier Coop');
+    expect(back.user.permissions).toEqual(expect.arrayContaining(['membership:invite', 'membership:approve']));
+
+    // Ordinary refresh shares the extracted token check — it must still work, and stay put.
+    const refreshed = await auth.refresh(back.refreshToken);
+    expect(refreshed.user.tenantName).toBe('Xavier Coop');
+  });
+
+  it('COOPERATIVE SWITCHER — refuses an access token, a garbage token, a cooperative they are not in, and a deactivated membership', async () => {
+    const mine = await auth.login({ email: email('xavier'), password: PASSWORD });
+    const bohale = mine.tenants.find((t: any) => t.name === 'Bohale Test Coop');
+    const xavierCoop = mine.tenants.find((t: any) => t.name === 'Xavier Coop');
+    const session = await auth.selectTenant(mine.preAuthToken, xavierCoop.id);
+    const zed = await auth.login({ email: email('zed'), password: PASSWORD });
+
+    // a stolen 15-minute access token must not be convertible into a long-lived session elsewhere
+    await expect(auth.switchTenant(session.accessToken, bohale.id)).rejects.toThrow(/refresh token/i);
+    await expect(auth.switchTenant('not-a-token', bohale.id)).rejects.toThrow(/refresh token/i);
+    await expect(auth.switchTenant(session.refreshToken, zed.user.tenantId)).rejects.toThrow(/do not belong/);
+
+    const membership = await ds.getRepository(TenantUser).findOneOrFail({ where: { tenantId: bohale.id, userId: session.user.id } });
+    await ds.getRepository(TenantUser).update({ id: membership.id }, { isActive: false });
+    await expect(auth.switchTenant(session.refreshToken, bohale.id)).rejects.toThrow(/do not belong/);
+    expect((await auth.listMyTenants(session.user.id)).map((t: any) => t.name)).toEqual(['Xavier Coop']);
+    await ds.getRepository(TenantUser).update({ id: membership.id }, { isActive: true });
+  });
 });

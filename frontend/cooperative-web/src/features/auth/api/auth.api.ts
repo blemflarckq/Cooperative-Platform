@@ -1,18 +1,20 @@
 import { apiClient } from "@/lib/api/api-client";
 import type {
-    AcceptInvitationRequest,
-    AcceptInvitationResponse,
-    ChangePasswordRequest,
-    ChangePasswordResponse,
-    LoginRequest,
-    RegisterRequest,
-    AuthResult,
-    SelectTenantRequest,
-    CreateTenantRequest,
-    LoginResponse,
-    AuthenticatedUserResponse,
-    RefreshTokenRequest,
-    RefreshTokenResponse,
+  AcceptInvitationRequest,
+  AcceptInvitationResponse,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  LoginRequest,
+  RegisterRequest,
+  AuthResult,
+  SelectTenantRequest,
+  CreateTenantRequest,
+  LoginResponse,
+  AuthenticatedUserResponse,
+  RefreshTokenRequest,
+  RefreshTokenResponse,
+  SwitchTenantRequest,
+  TenantOption,
 } from "@/features/auth/types/auth.types";
 
 export async function loginRequest(
@@ -87,5 +89,15 @@ export async function refreshTokenRequest(
 }
 export async function setMobileRequest(mobile: string): Promise<{ mobile: string }> {
   const response = await apiClient.post<{ mobile: string }>("/auth/set-mobile", { mobile });
+  return response.data;
+}
+
+export async function getMyTenantsRequest(): Promise<TenantOption[]> {
+  const response = await apiClient.get<TenantOption[]>("/auth/my-tenants");
+  return response.data;
+}
+
+export async function switchTenantRequest(payload: SwitchTenantRequest): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>("/auth/switch-tenant", payload);
   return response.data;
 }

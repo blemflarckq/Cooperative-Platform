@@ -5,6 +5,8 @@ import { AuthService, AuthResult, LoginResponse } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { SelectTenantDto } from "./dto/select-tenant.dto";
+import { SwitchTenantDto } from "./dto/switch-tenant.dto";
+import { SkipTenantCheck } from "../tenancy/skip-tenant-check.decorator";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { OAuthCompleteDto } from "./dto/oauth-complete.dto";
 import { Public } from "./public.decorator";
@@ -51,6 +53,27 @@ export class AuthController {
   @Post("select-tenant")
   async selectTenant(@Body() dto: SelectTenantDto): Promise<LoginResponse> {
     return this.auth.selectTenant(dto.preAuthToken, dto.tenantId);
+  }
+
+  /**
+   * The cooperatives the signed-in person belongs to. About the person,
+   * not any one cooperative, so the usual "header must match the token's
+   * cooperative" rule doesn't apply — they still need a valid session.
+   */
+  @SkipTenantCheck()
+  @Get("my-tenants")
+  async myTenants(@CurrentUser("sub") userId: string) {
+    return this.auth.listMyTenants(userId);
+  }
+
+  /**
+   * Public like refresh: it's authorised by the refresh token in the body,
+   * not by an access token — see AuthService.switchTenant for why.
+   */
+  @Public()
+  @Post("switch-tenant")
+  async switchTenant(@Body() dto: SwitchTenantDto): Promise<LoginResponse> {
+    return this.auth.switchTenant(dto.refreshToken, dto.tenantId);
   }
 
   /**
