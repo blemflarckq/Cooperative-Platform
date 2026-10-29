@@ -14,3 +14,15 @@ npm run start:worker
 cd frontend/cooperative-web
 npm install
 npm run dev
+
+Build and testing:
+cd backend
+npm install
+npx tsc --noEmit -p apps/api/tsconfig.app.json
+npm run build
+npx jest
+npm run db:run
+
+cd frontend/cooperative-web
+npx tsc -b
+npm run build

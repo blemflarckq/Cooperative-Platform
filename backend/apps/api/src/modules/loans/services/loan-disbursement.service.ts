@@ -110,7 +110,9 @@ export class LoanDisbursementService {
       );
 
       loan.status = LoanStatus.ACTIVE;
-      loan.peerRateLastEscalatedAt = new Date();
+      const disbursedAt = new Date();
+      loan.peerRateLastEscalatedAt = disbursedAt;
+      loan.disbursedAt = disbursedAt;
 
       return manager.save(Loan, loan);
     });

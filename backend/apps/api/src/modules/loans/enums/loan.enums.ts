@@ -29,3 +29,16 @@ export enum AtCapBehavior {
   CONTINUE_AT_CAP = "CONTINUE_AT_CAP",
   FLAG_AND_BLOCK = "FLAG_AND_BLOCK",
 }
+
+/**
+ * How a scheme's peer-funded rate moves over a loan's life. Both stay
+ * available and each scheme picks one:
+ * - RAMP: rises by a set increment every month until it hits the cap.
+ * - PERIODS: three flat stages by loan age — an initial period, a later
+ *   period, then the cut-off rate from there on.
+ * The self-funded tranche is unaffected by either: its rate is fixed.
+ */
+export enum RateScheduleMode {
+  RAMP = "RAMP",
+  PERIODS = "PERIODS",
+}

@@ -1,5 +1,5 @@
-import { IsEnum, IsString } from "class-validator";
-import { AtCapBehavior } from "../enums/loan.enums";
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { AtCapBehavior, RateScheduleMode } from "../enums/loan.enums";
 
 export class UpsertLoanPolicyDto {
   @IsString()
@@ -16,4 +16,25 @@ export class UpsertLoanPolicyDto {
 
   @IsEnum(AtCapBehavior)
   atCapBehavior!: AtCapBehavior;
+
+  /** Omitted means RAMP, so existing clients keep working unchanged. */
+  @IsOptional()
+  @IsEnum(RateScheduleMode)
+  rateScheduleMode?: RateScheduleMode;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  initialPeriodMonths?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  laterPeriodMonths?: number;
+
+  @IsOptional()
+  @IsString()
+  peerLaterMonthlyRate?: string;
 }

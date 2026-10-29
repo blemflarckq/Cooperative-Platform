@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { DataSource, EntityManager } from "typeorm";
 import { LoanPolicy } from "../entities/loan-policy.entity";
 import { CooperativeScheme } from "../../schemes/entities/cooperative-scheme.entity";
-import { AtCapBehavior } from "../enums/loan.enums";
+import { AtCapBehavior, RateScheduleMode } from "../enums/loan.enums";
 import { ActorTenantUserResolverService } from "../../schemes/services/actor-tenant-user-resolver.service";
 
 export interface UpsertLoanPolicyInput {
@@ -11,6 +11,10 @@ export interface UpsertLoanPolicyInput {
   peerMonthlyRateIncrement: string;
   peerCapRate: string;
   atCapBehavior: AtCapBehavior;
+  rateScheduleMode?: RateScheduleMode;
+  initialPeriodMonths?: number;
+  laterPeriodMonths?: number;
+  peerLaterMonthlyRate?: string;
 }
 
 /**
@@ -73,10 +77,23 @@ export class LoanPolicyService {
         where: { tenantId, schemeId },
       });
 
+      // The period fields only mean anything in PERIODS mode — switching
+      // a scheme back to RAMP clears them rather than leaving stale values
+      // that look meaningful but aren't being used.
+      const mode = input.rateScheduleMode ?? RateScheduleMode.RAMP;
+      const isPeriods = mode === RateScheduleMode.PERIODS;
+      const values = {
+        ...input,
+        rateScheduleMode: mode,
+        initialPeriodMonths: isPeriods ? (input.initialPeriodMonths ?? null) : null,
+        laterPeriodMonths: isPeriods ? (input.laterPeriodMonths ?? null) : null,
+        peerLaterMonthlyRate: isPeriods ? (input.peerLaterMonthlyRate ?? null) : null,
+      };
+
       if (policy) {
-        Object.assign(policy, input);
+        Object.assign(policy, values);
       } else {
-        policy = manager.create(LoanPolicy, { tenantId, schemeId, ...input });
+        policy = manager.create(LoanPolicy, { tenantId, schemeId, ...values });
       }
 
       // Explicitly configuring real values via this endpoint IS the
@@ -106,6 +123,30 @@ export class LoanPolicyService {
       throw new BadRequestException(
         "peerBaseMonthlyRate cannot be greater than peerCapRate.",
       );
+    }
+
+    if ((input.rateScheduleMode ?? RateScheduleMode.RAMP) === RateScheduleMode.PERIODS) {
+      for (const [name, value] of [
+        ["initialPeriodMonths", input.initialPeriodMonths],
+        ["laterPeriodMonths", input.laterPeriodMonths],
+      ] as const) {
+        if (!Number.isInteger(value) || (value as number) < 1) {
+          throw new BadRequestException(`${name} must be a whole number of months, at least 1.`);
+        }
+      }
+
+      const later = Number(input.peerLaterMonthlyRate);
+      if (!input.peerLaterMonthlyRate || Number.isNaN(later) || later < 0) {
+        throw new BadRequestException("peerLaterMonthlyRate must be a non-negative number.");
+      }
+
+      // A schedule that gets cheaper as a loan ages is almost certainly a
+      // typo (rates swapped), and "escalation" means it shouldn't.
+      if (!(Number(input.peerBaseMonthlyRate) <= later && later <= Number(input.peerCapRate))) {
+        throw new BadRequestException(
+          "Rates should rise as a loan ages: the initial rate, then the later rate, then the cut-off rate — each at least as high as the one before.",
+        );
+      }
     }
   }
 }

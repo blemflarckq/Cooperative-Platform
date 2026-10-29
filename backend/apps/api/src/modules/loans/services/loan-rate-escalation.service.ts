@@ -1,21 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { Loan } from "../entities/loan.entity";
-import { LoanStatus } from "../enums/loan.enums";
+import { LoanStatus, RateScheduleMode } from "../enums/loan.enums";
 import { ActorTenantUserResolverService } from "../../schemes/services/actor-tenant-user-resolver.service";
 import { computeNextMonthlyRate } from "./loan-interest-escalation";
+import { planScheduledRateUpdate } from "./loan-rate-schedule";
+import { applyRatePlanToLoan, flagLoanAtRisk, toLoanRateTerms } from "./loan-rate-schedule.service";
 
 /**
- * Escalates a single active loan's peer-funded rate by one step, per the
- * rules in loan-interest-escalation.ts.
+ * A treasurer's manual lever on a single loan. Rates now also move
+ * automatically (see LoanRateScheduleService, run daily), so this is for
+ * stepping in, not for routine operation:
  *
- * IMPORTANT — this is currently manually triggered, not scheduled. There's
- * no monthly cron job calling this yet; that's the next piece of
- * infrastructure needed (a scheduled task, most naturally in the worker
- * app) before this actually escalates automatically over time. Built and
- * tested in isolation first, same as everything else this project has
- * done with money logic — wiring it to a real clock is a deliberate next
- * step, not an oversight.
+ * - RAMP: applies one monthly step right now, exactly as it always did.
+ * - PERIODS: re-evaluates the loan against its schedule right now — the
+ *   rate is a function of the loan's age, so there's no "one step" to
+ *   take, only "make it correct for today."
  */
 @Injectable()
 export class LoanRateEscalationService {
@@ -48,20 +48,24 @@ export class LoanRateEscalationService {
         return loan;
       }
 
-      const { nextRate, shouldFlagAtRisk } = computeNextMonthlyRate({
-        currentRate: Number(loan.currentPeerMonthlyRate),
-        increment: Number(loan.peerMonthlyRateIncrement),
-        capRate: Number(loan.peerCapRate),
-        atCapBehavior: loan.atCapBehavior,
-      });
+      const now = new Date();
 
-      loan.currentPeerMonthlyRate = nextRate.toFixed(2);
-      loan.peerRateLastEscalatedAt = new Date();
+      if (loan.rateScheduleMode === RateScheduleMode.PERIODS) {
+        applyRatePlanToLoan(loan, planScheduledRateUpdate(toLoanRateTerms(loan), now), now);
+      } else {
+        const { nextRate, shouldFlagAtRisk } = computeNextMonthlyRate({
+          currentRate: Number(loan.currentPeerMonthlyRate),
+          increment: Number(loan.peerMonthlyRateIncrement),
+          capRate: Number(loan.peerCapRate),
+          atCapBehavior: loan.atCapBehavior,
+        });
 
-      if (shouldFlagAtRisk) {
-        loan.isAtRiskFlagged = true;
-        loan.flaggedAtRiskAt = new Date();
-        loan.status = LoanStatus.AT_RISK;
+        loan.currentPeerMonthlyRate = nextRate.toFixed(2);
+        loan.peerRateLastEscalatedAt = now;
+
+        if (shouldFlagAtRisk) {
+          flagLoanAtRisk(loan, now);
+        }
       }
 
       return manager.save(Loan, loan);

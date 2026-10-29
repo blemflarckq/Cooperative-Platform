@@ -13,6 +13,8 @@ import { MemberBalanceService } from "./services/member-balance.service";
 import { LoanDisbursementService } from "./services/loan-disbursement.service";
 import { LoanRepaymentsService } from "./services/loan-repayments.service";
 import { LoanRateEscalationService } from "./services/loan-rate-escalation.service";
+import { LoanRateScheduleService } from "./services/loan-rate-schedule.service";
+import { LoanRateScheduleTask } from "./services/loan-rate-schedule.task";
 import { LoanPolicyController } from "./controllers/loan-policy.controller";
 import { LoansController } from "./controllers/loans.controller";
 
@@ -40,12 +42,14 @@ import { LoansController } from "./controllers/loans.controller";
     LoanDisbursementService,
     LoanRepaymentsService,
     LoanRateEscalationService,
+    LoanRateScheduleService,
+    LoanRateScheduleTask,
   ],
   controllers: [LoanPolicyController, LoansController],
   // LoanRepaymentsService is exported specifically so PaymentsModule can
   // reach it via proper DI — the payment allocation engine needs to
   // record loan repayments as part of an atomic allocation, without
   // duplicating that logic or reaching into LoansModule's internals.
-  exports: [LoanPolicyService, LoansService, LoanRepaymentsService],
+  exports: [LoanPolicyService, LoansService, LoanRepaymentsService, LoanRateScheduleService],
 })
 export class LoansModule {}

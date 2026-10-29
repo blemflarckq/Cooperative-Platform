@@ -23,6 +23,7 @@ import { SubscriptionsPage } from "@/features/subscriptions/pages/SubscriptionsP
 import { ContributionsPage } from "@/features/contributions/pages/ContributionsPage";
 import { LoansPage } from "@/features/loans/pages/LoansPage";
 import { RequestLoanPage } from "@/features/loans/pages/RequestLoanPage";
+import { LoanPolicyPage } from "@/features/loans/pages/LoanPolicyPage";
 import { LoanDetailPage } from "@/features/loans/pages/LoanDetailPage";
 import { RecordPaymentPage } from "@/features/payments/pages/RecordPaymentPage";
 import { MyPaymentsPage } from "@/features/payments/pages/MyPaymentsPage";
@@ -114,6 +115,7 @@ export function AppRouter() {
               <Route path=":schemeId/approvals" element={<ApprovalsPage />} />
               <Route path=":schemeId/loans" element={<LoansPage />} />
               <Route path=":schemeId/loans/new" element={<RequestLoanPage />} />
+              <Route path=":schemeId/loan-policy" element={<LoanPolicyPage />} />
               <Route
                 path=":schemeId/cycles/new"
                 element={<CreateCyclePage />}

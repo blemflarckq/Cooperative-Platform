@@ -4,7 +4,7 @@ import { Loan } from "../entities/loan.entity";
 import { LoanPolicy } from "../entities/loan-policy.entity";
 import { LoanPledge } from "../entities/loan-pledge.entity";
 import { CooperativeScheme } from "../../schemes/entities/cooperative-scheme.entity";
-import { LoanStatus } from "../enums/loan.enums";
+import { LoanStatus, RateScheduleMode } from "../enums/loan.enums";
 import { OutboundRequestType } from "../../schemes/enums/governance.enums";
 import { splitLoanIntoTranches } from "./loan-tranche-split";
 import { MemberBalanceService } from "./member-balance.service";
@@ -210,6 +210,14 @@ export class LoansService {
         peerMonthlyRateIncrement: policy.peerMonthlyRateIncrement,
         peerCapRate: policy.peerCapRate,
         atCapBehavior: policy.atCapBehavior,
+        rateScheduleMode: policy.rateScheduleMode,
+        initialPeriodMonths: policy.initialPeriodMonths,
+        laterPeriodMonths: policy.laterPeriodMonths,
+        // In PERIODS mode the initial rate IS the policy's base rate; a
+        // RAMP loan has no separate initial rate to remember.
+        peerInitialMonthlyRate:
+          policy.rateScheduleMode === RateScheduleMode.PERIODS ? policy.peerBaseMonthlyRate : null,
+        peerLaterMonthlyRate: policy.peerLaterMonthlyRate,
         status: isFullyPledgedAlready
           ? LoanStatus.PENDING_APPROVAL
           : LoanStatus.PENDING_PLEDGES,

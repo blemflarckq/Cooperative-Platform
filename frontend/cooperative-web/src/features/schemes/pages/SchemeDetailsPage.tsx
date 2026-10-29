@@ -1,4 +1,4 @@
-import { CheckCircle2, ClipboardCheck, HandCoins, Pencil, Plus } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, HandCoins, Pencil, Percent, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -187,6 +187,16 @@ export function SchemeDetailsPage() {
               >
                 <HandCoins className="mr-2 size-4" />
                 Loans
+              </Button>
+            </PermissionGate>
+
+            <PermissionGate permissions={["loan-policy:read"]}>
+              <Button
+                variant="outline"
+                onClick={() => navigate(appPath(`/schemes/${scheme.id}/loan-policy`))}
+              >
+                <Percent className="mr-2 size-4" />
+                Loan terms
               </Button>
             </PermissionGate>
 

@@ -5,7 +5,7 @@ import { OperatingCycle } from "../../schemes/entities/operating-cycle.entity";
 import { TenantUser } from "../../identity/entities/tenant-user.entity";
 import { OutboundRequest } from "../../schemes/entities/outbound-request.entity";
 import { LoanPledge } from "./loan-pledge.entity";
-import { AtCapBehavior, LoanStatus } from "../enums/loan.enums";
+import { AtCapBehavior, LoanStatus, RateScheduleMode } from "../enums/loan.enums";
 
 /**
  * A loan splits automatically into two tranches at request time:
@@ -80,6 +80,34 @@ export class Loan extends BaseEntity {
 
   @Column({ type: "enum", enum: AtCapBehavior })
   atCapBehavior!: AtCapBehavior;
+
+  // The rate schedule, copied from the policy at the moment the loan is
+  // created — like every other term here, so editing a policy later can
+  // never change what someone already agreed to.
+  @Column({ type: "enum", enum: RateScheduleMode, default: RateScheduleMode.RAMP })
+  rateScheduleMode!: RateScheduleMode;
+
+  @Column({ type: "int", nullable: true })
+  initialPeriodMonths!: number | null;
+
+  @Column({ type: "int", nullable: true })
+  laterPeriodMonths!: number | null;
+
+  @Column({ type: "numeric", precision: 5, scale: 2, nullable: true })
+  peerInitialMonthlyRate!: string | null;
+
+  @Column({ type: "numeric", precision: 5, scale: 2, nullable: true })
+  peerLaterMonthlyRate!: string | null;
+
+  /**
+   * When the money actually went out — the start of the loan's age for a
+   * PERIODS schedule. peerRateLastEscalatedAt can't serve: it moves on
+   * every escalation. Only populated for loans disbursed after this
+   * field existed; a RAMP loan never needs it, and it isn't guessed for
+   * older ones.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  disbursedAt!: Date | null;
 
   /** When the peer rate was last escalated — determines when the next escalation is due. */
   @Column({ type: "timestamptz", nullable: true })

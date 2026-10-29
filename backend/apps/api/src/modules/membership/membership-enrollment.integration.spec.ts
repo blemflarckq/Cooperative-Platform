@@ -41,6 +41,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
   let tenantUsersService: any;
   let Mapper: any;
   let TenantUser: any, TenantUserRole: any, Role: any, MembershipEnrollmentRequest: any, InviteLink: any;
+  let Loan: any, schedule: any;
 
   let tenantId: string;
   let admin: any, treasurer: any, plainMember: any;
@@ -75,6 +76,9 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     ({ Role } = require('../identity/entities/role.entity'));
     ({ MembershipEnrollmentRequest } = require('./entities/membership-enrollment-request.entity'));
     ({ InviteLink } = require('./entities/invite-link.entity'));
+    ({ Loan } = require('../loans/entities/loan.entity'));
+    const { LoansModule } = require('../loans/loans.module');
+    const { LoanRateScheduleService } = require('../loans/services/loan-rate-schedule.service');
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -88,6 +92,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
           retryAttempts: 1,
         }),
         MembershipModule,
+        LoansModule,
       ],
     }).compile();
 
@@ -95,6 +100,7 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     auth = moduleRef.get(AuthService, { strict: false });
     enrollment = moduleRef.get(MembershipEnrollmentService, { strict: false });
     tenantUsersService = moduleRef.get(TenantUsersService, { strict: false });
+    schedule = moduleRef.get(LoanRateScheduleService, { strict: false });
   });
 
   afterAll(async () => { await ds?.destroy(); });
@@ -229,5 +235,114 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     expect(json).not.toMatch(/\$2[aby]\$/);
     expect(json).not.toContain('58123456');
     expect(rows.every((r: any) => Array.isArray(r.schemeNames))).toBe(true);
+  });
+
+  it('INVITEE ALREADY IN ANOTHER COOPERATIVE (signed in) — joins, keeps their own cooperative meanwhile, ends up in both', async () => {
+    const x = await reg('xavier');
+    const session = await auth.createTenant(x.preAuthToken, 'Xavier Coop');
+    const link = await enrollment.generateInviteLink(tenantId, admin.userId);
+
+    const joined = await enrollment.acceptInvite(link.token, session.user.id);
+    expect(joined).toMatchObject({ status: 'PENDING_APPROVAL', tenantName: 'Bohale Test Coop' });
+
+    // A pending request elsewhere must NOT hijack sign-in: they have a cooperative of their own.
+    const during = await auth.login({ email: email('xavier'), password: PASSWORD });
+    expect(during.status).toBe('authenticated');
+    expect(during.user.tenantName).toBe('Xavier Coop');
+
+    const queue = await enrollment.listPendingEnrollments(tenantId, admin.userId);
+    const req = queue.find((q: any) => q.applicant.fullName.startsWith('xavier'));
+    await enrollment.recordApproval(tenantId, req.id, admin.userId, 'APPROVED');
+    await enrollment.recordApproval(tenantId, req.id, treasurer.userId, 'APPROVED');
+
+    const after = await auth.login({ email: email('xavier'), password: PASSWORD });
+    expect(after.status).toBe('select_tenant');
+    expect(after.tenants.map((t: any) => t.name).sort()).toEqual(['Bohale Test Coop', 'Xavier Coop']);
+
+    const inB = await auth.selectTenant(after.preAuthToken, tenantId);
+    expect(inB.user.tenantName).toBe('Bohale Test Coop');
+    expect(inB.user.roles).toEqual(['Member']);
+  });
+
+  it('INVITEE IN SEVERAL COOPERATIVES (pre-auth only) — can follow a third invite; sign-in is unaffected while it is pending', async () => {
+    const z = await reg('zed');
+    const zSession = await auth.createTenant(z.preAuthToken, 'Zed Coop');
+    const zLink = await enrollment.generateInviteLink(zSession.user.tenantId, zSession.user.id);
+
+    const login = await auth.login({ email: email('xavier'), password: PASSWORD });
+    expect(login.status).toBe('select_tenant'); // two cooperatives, so only a pre-auth token — no access token
+    const person = await auth.loadUserFromPreAuthToken(login.preAuthToken);
+    expect((await enrollment.acceptInvite(zLink.token, person.id)).tenantName).toBe('Zed Coop');
+
+    const again = await auth.login({ email: email('xavier'), password: PASSWORD });
+    expect(again.status).toBe('select_tenant');
+    expect(again.tenants).toHaveLength(2);
+  });
+
+  it('RATE SCHEDULE on real loans — periods by age, ramp catch-up on its own rhythm, flags, idempotent, no re-stamping', async () => {
+    const { randomUUID } = require('crypto');
+    const NOW = new Date('2026-10-10T08:00:00Z');
+    const monthsAgo = (m: number, extraDays = 0) => {
+      const dt = new Date(NOW);
+      dt.setUTCMonth(dt.getUTCMonth() - m);
+      dt.setUTCDate(dt.getUTCDate() - extraDays);
+      return dt;
+    };
+    const base = (over: Record<string, any>) => ({
+      id: randomUUID(), tenantId, schemeId: randomUUID(), cycleId: randomUUID(), borrowerTenantUserId: randomUUID(),
+      principalAmount: '1000.00', selfFundedPrincipal: '400.00', selfFundedOutstandingPrincipal: '400.00',
+      selfFundedMonthlyRate: '2.00', peerFundedPrincipal: '600.00', peerFundedOutstandingPrincipal: '600.00',
+      currentPeerMonthlyRate: '5.00', peerMonthlyRateIncrement: '1.00', peerCapRate: '12.00',
+      atCapBehavior: 'CONTINUE_AT_CAP', status: 'ACTIVE', ...over,
+    });
+    const periods = { rateScheduleMode: 'PERIODS', initialPeriodMonths: 3, laterPeriodMonths: 3, peerInitialMonthlyRate: '5.00', peerLaterMonthlyRate: '8.00' };
+    const L = {
+      periodsLater: base({ ...periods, disbursedAt: monthsAgo(4) }),
+      periodsCutoffFlag: base({ ...periods, atCapBehavior: 'FLAG_AND_BLOCK', disbursedAt: monthsAgo(8) }),
+      rampCatchUp: base({ peerCapRate: '8.00', peerRateLastEscalatedAt: monthsAgo(3, 5) }),
+      rampAtCapFlag: base({ currentPeerMonthlyRate: '8.00', peerCapRate: '8.00', atCapBehavior: 'FLAG_AND_BLOCK', peerRateLastEscalatedAt: monthsAgo(1, 1) }),
+      noPeerPrincipal: base({ ...periods, peerFundedOutstandingPrincipal: '0.00', disbursedAt: monthsAgo(8) }),
+      notLive: base({ ...periods, status: 'PENDING_APPROVAL', disbursedAt: monthsAgo(8) }),
+      noDate: base({ ...periods, disbursedAt: null }),
+    };
+
+    // These loans point at no real scheme/cycle/borrower, so the FK checks are switched off for the inserts only.
+    const qr = ds.createQueryRunner();
+    await qr.connect();
+    try {
+      await qr.query('SET session_replication_role = replica');
+      for (const row of Object.values(L)) await qr.manager.insert(Loan, row);
+    } finally {
+      await qr.query('SET session_replication_role = DEFAULT');
+      await qr.release();
+    }
+    const get = (l: any) => ds.getRepository(Loan).findOneOrFail({ where: { id: l.id } });
+
+    const first = await schedule.applyDueRates(NOW);
+    expect(first).toEqual({ examined: 6, changed: 4, newlyFlagged: 2, skipped: 1, failed: 0 });
+
+    expect(Number((await get(L.periodsLater)).currentPeerMonthlyRate)).toBe(8);
+
+    const cutoff = await get(L.periodsCutoffFlag);
+    expect(Number(cutoff.currentPeerMonthlyRate)).toBe(12);
+    expect([cutoff.isAtRiskFlagged, cutoff.status]).toEqual([true, 'AT_RISK']);
+    expect(cutoff.flaggedAtRiskAt.toISOString()).toBe(NOW.toISOString());
+
+    const ramp = await get(L.rampCatchUp);
+    expect(Number(ramp.currentPeerMonthlyRate)).toBe(8); // 6, 7, 8 — three missed months caught up
+    expect(ramp.peerRateLastEscalatedAt.toISOString()).toBe('2026-10-05T08:00:00.000Z'); // anchor + 3 months, NOT "now"
+
+    expect((await get(L.rampAtCapFlag)).isAtRiskFlagged).toBe(true);
+    expect(Number((await get(L.noPeerPrincipal)).currentPeerMonthlyRate)).toBe(5);
+    expect(Number((await get(L.notLive)).currentPeerMonthlyRate)).toBe(5);
+    expect(Number((await get(L.noDate)).currentPeerMonthlyRate)).toBe(5); // skipped, never guessed
+    for (const l of Object.values(L)) expect(Number((await get(l)).selfFundedMonthlyRate)).toBe(2); // self-funded never moves
+
+    // Running it again at the same moment changes nothing — safe on two servers, safe after an outage.
+    expect(await schedule.applyDueRates(NOW)).toEqual({ examined: 6, changed: 0, newlyFlagged: 0, skipped: 1, failed: 0 });
+
+    // And a later run must not re-stamp when an already-flagged loan became at risk.
+    await schedule.applyDueRates(new Date('2026-11-24T08:00:00Z'));
+    expect((await get(L.periodsCutoffFlag)).flaggedAtRiskAt.toISOString()).toBe(NOW.toISOString());
   });
 });
