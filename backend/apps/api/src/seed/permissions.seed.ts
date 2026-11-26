@@ -5,7 +5,7 @@ import { Permission } from "../modules/identity/entities/permission.entity";
  * Define permissions in a structured, grouped way.
  * This keeps things readable and easy to maintain.
  */
-const PERMISSIONS: Array<{
+export const PERMISSIONS: Array<{
   resource: string;
   actions: Array<{ action: string; description: string }>;
 }> = [
