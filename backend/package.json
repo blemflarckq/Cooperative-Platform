@@ -30,9 +30,11 @@
     "db:revert": "npm run db:cli -- migration:revert",
     "db:create": "typeorm-ts-node-commonjs migration:create apps/api/src/migrations/Init",
     "db:generate": "npm run db:cli -- migration:generate apps/api/src/migrations/migration",
+    "db:drift": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/config/check-schema-drift.ts",
     "build:seed": "nest build --config nest-cli.seed.json",
     "seed": "docker exec -it coop_api node dist/seed/seed.js",
     "seed:dev": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/seed.ts",
+    "seed:permissions": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/seed-permissions.ts",
     "seed:scenarios": "dotenv -e infra/.env -- ts-node -r tsconfig-paths/register apps/api/src/seed/scenarios/test-scenario.seed.ts"
   },
   "dependencies": {

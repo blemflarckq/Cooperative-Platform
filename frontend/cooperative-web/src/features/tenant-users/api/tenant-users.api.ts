@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api/api-client";
 import type {
   CreateTenantUserRequest,
   SyncTenantUserRolesRequest,
+  TenantRoleOption,
   TenantUserDetails,
   TenantUserListItem,
   TenantUserResponse,
@@ -73,14 +74,30 @@ export async function updateTenantUser(
   return mapTenantUserToDetails(response.data);
 }
 
-export async function deactivateTenantUser(
+/**
+ * The server exposes deactivation as DELETE /tenant-users/:id and answers
+ * with a confirmation, not the member. (The page used to call
+ * PATCH …/deactivate, which has never existed.) Nothing is deleted — the
+ * member is switched off and can be reactivated.
+ */
+export async function deactivateTenantUser(tenantUserId: string): Promise<void> {
+  await apiClient.delete(`/tenant-users/${tenantUserId}`);
+}
+
+export async function reactivateTenantUser(
   tenantUserId: string,
 ): Promise<TenantUserDetails> {
-  const response = await apiClient.patch<TenantUserResponse>(
-    `/tenant-users/${tenantUserId}/deactivate`,
+  const response = await apiClient.post<TenantUserResponse>(
+    `/tenant-users/${tenantUserId}/reactivate`,
   );
 
   return mapTenantUserToDetails(response.data);
+}
+
+/** The cooperative's roles, each marked with whether the caller may give it out. */
+export async function getTenantRoles(): Promise<TenantRoleOption[]> {
+  const response = await apiClient.get<TenantRoleOption[]>("/roles");
+  return response.data;
 }
 
 export async function syncTenantUserRoles(

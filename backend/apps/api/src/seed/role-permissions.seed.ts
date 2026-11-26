@@ -31,8 +31,8 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'user:activate',
     'user:reset-password',
     'user:assign-role',
-    'create_temp_password',
-    'invite',
+    'user:create_temp_password',
+    'user:invite',
 
     'role:create',
     'role:read',
@@ -186,8 +186,8 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'user:deactivate',
     'user:activate',
     'user:assign-role',
-    'create_temp_password',
-    'invite',
+    'user:create_temp_password',
+    'user:invite',
 
     'role:read',
     'role:read.all',

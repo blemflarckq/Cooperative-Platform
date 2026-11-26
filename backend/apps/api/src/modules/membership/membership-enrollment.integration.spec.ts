@@ -24,6 +24,9 @@ jest.setTimeout(120000);
  *   createdb coop_it
  *   ENROLLMENT_IT_DATABASE_URL=postgres://user:pass@localhost:5432/coop_it \
  *     npx jest membership-enrollment.integration
+ *
+ * Add ENROLLMENT_IT_SCHEMA=migrations to build the schema from the real
+ * migrations instead of the entities (see below).
  */
 const dbUrl = process.env.ENROLLMENT_IT_DATABASE_URL;
 if (dbUrl && !/\/[^/?]*_it(\?|$)/.test(dbUrl)) {
@@ -90,8 +93,15 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
           url: dbUrl,
           entities: [join(__dirname, '../../**/*.entity.ts')],
           autoLoadEntities: true,
-          synchronize: true,
           dropSchema: true,
+          // Default: build the schema straight from the entities (fast).
+          // ENROLLMENT_IT_SCHEMA=migrations: build it by running the repo's
+          // REAL migrations instead — which proves they still produce
+          // exactly the schema the code expects. If an entity changes and
+          // its migration is forgotten, that mode fails; sync mode cannot.
+          ...(process.env.ENROLLMENT_IT_SCHEMA === 'migrations'
+            ? { synchronize: false, migrationsRun: true, migrations: [join(__dirname, '../../migrations/*.{ts,js}')] }
+            : { synchronize: true }),
           retryAttempts: 1,
         }),
         MembershipModule,
@@ -439,5 +449,10 @@ describeIfEnabled('enrollment flow against a real Postgres', () => {
     await expect(auth.switchTenant(session.refreshToken, bohale.id)).rejects.toThrow(/do not belong/);
     expect((await auth.listMyTenants(session.user.id)).map((t: any) => t.name)).toEqual(['Xavier Coop']);
     await ds.getRepository(TenantUser).update({ id: membership.id }, { isActive: true });
+  });
+
+  it('SCHEMA — nothing is left over: the database matches the entities exactly (catches an entity changed without its migration)', async () => {
+    const pending = (await ds.driver.createSchemaBuilder().log()).upQueries.map((q: any) => q.query);
+    expect(pending).toEqual([]);
   });
 });

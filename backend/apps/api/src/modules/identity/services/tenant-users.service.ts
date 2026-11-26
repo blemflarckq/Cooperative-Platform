@@ -1,10 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Brackets, DataSource, ILike, Repository, In } from 'typeorm';
+import { Brackets, DataSource, ILike, Not, Repository, In } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../entities/user.entity';
 import { TenantUser } from '../entities/tenant-user.entity';
@@ -18,6 +19,15 @@ import { CycleParticipantStatus, OperatingCycleStatus, SchemeStatus } from '../.
 import { IdentityOutboxService } from '../services/identity-outbox.service';
 import { CreateTempPasswordUserDto } from '../dto/create-temp-password-user.dto';
 import { hashPassword } from '../../../common/auth/password';
+import {
+  assertMayGrantInitialRoles,
+  countOtherActiveAdmins,
+  loadActor,
+  loadRoleCodes,
+  lockCooperative,
+  throwViolation,
+} from './tenant-user-governance';
+import { checkDeactivation, checkReactivation } from './tenant-user-rules';
 
 
 @Injectable()
@@ -117,6 +127,8 @@ export class TenantUsersService {
             'One or more roles are invalid or belong to another tenant.',
           );
         }
+
+        await assertMayGrantInitialRoles(manager, tenantId, actorUserId, roles);
 
         const joinRows = roles.map((role) =>
           manager.create(TenantUserRole, {
@@ -220,6 +232,8 @@ async createWithTemporaryPassword(params: {
         );
       }
 
+      await assertMayGrantInitialRoles(manager, tenantId, actorUserId, roles);
+
       const roleRows = roles.map((role) =>
         manager.create(TenantUserRole, {
           tenantUserId: tenantUser.id,
@@ -296,10 +310,26 @@ async createWithTemporaryPassword(params: {
       return [];
     }
 
-    // One batch query for every member's active scheme participation,
-    // rather than one query per row — resolved the same way the member
-    // dashboard resolves a person's own active schemes.
-    const participations = await this.tenantUsersRepository.manager
+    const schemeNamesByTenantUserId = await this.activeSchemeNamesByMember(tenantId);
+
+    return tenantUsers.map((tenantUser) => ({
+      tenantUser,
+      schemeNames: schemeNamesByTenantUserId.get(tenantUser.id) ?? [],
+    }));
+  }
+
+  /**
+   * Active scheme participation, resolved the same way the member
+   * dashboard resolves a person's own active schemes. One batch query for
+   * every member (or just one, when `tenantUserId` is given) rather than
+   * one per row. The single definition of "which schemes is this member
+   * in" for both the list and the detail view.
+   */
+  private async activeSchemeNamesByMember(
+    tenantId: string,
+    tenantUserId?: string,
+  ): Promise<Map<string, string[]>> {
+    const qb = this.tenantUsersRepository.manager
       .createQueryBuilder(CycleParticipant, 'participant')
       .innerJoin('participant.cycle', 'cycle')
       .innerJoin('cycle.scheme', 'scheme')
@@ -308,21 +338,29 @@ async createWithTemporaryPassword(params: {
         participantStatus: CycleParticipantStatus.ACTIVE,
       })
       .andWhere('cycle.status = :cycleStatus', { cycleStatus: OperatingCycleStatus.OPEN })
-      .andWhere('scheme.status = :schemeStatus', { schemeStatus: SchemeStatus.ACTIVE })
+      .andWhere('scheme.status = :schemeStatus', { schemeStatus: SchemeStatus.ACTIVE });
+
+    if (tenantUserId) {
+      qb.andWhere('participant.tenantUserId = :tenantUserId', { tenantUserId });
+    }
+
+    const participations = await qb
       .select(['participant.tenantUserId AS "tenantUserId"', 'scheme.name AS "schemeName"'])
       .getRawMany<{ tenantUserId: string; schemeName: string }>();
 
-    const schemeNamesByTenantUserId = new Map<string, string[]>();
+    const byMember = new Map<string, string[]>();
     for (const row of participations) {
-      const existing = schemeNamesByTenantUserId.get(row.tenantUserId) ?? [];
+      const existing = byMember.get(row.tenantUserId) ?? [];
       existing.push(row.schemeName);
-      schemeNamesByTenantUserId.set(row.tenantUserId, existing);
+      byMember.set(row.tenantUserId, existing);
     }
+    return byMember;
+  }
 
-    return tenantUsers.map((tenantUser) => ({
-      tenantUser,
-      schemeNames: schemeNamesByTenantUserId.get(tenantUser.id) ?? [],
-    }));
+  /** The names of the schemes one member is currently active in. */
+  async getActiveSchemeNames(tenantId: string, tenantUserId: string): Promise<string[]> {
+    const byMember = await this.activeSchemeNamesByMember(tenantId, tenantUserId);
+    return byMember.get(tenantUserId) ?? [];
   }
 
   async getTenantUser(tenantId: string, tenantUserId: string): Promise<TenantUser> {
@@ -358,8 +396,11 @@ async createWithTemporaryPassword(params: {
         tenantId,
         isActive: true,
       },
+      // Roles included: screens use them to say up front what the viewer
+      // may and may not do, rather than failing after the tap.
       relations: {
         user: true,
+        roles: { role: true },
       },
     });
 
@@ -371,7 +412,22 @@ async createWithTemporaryPassword(params: {
   }
 
   /**
-   * Updates tenant-specific membership and selected global user fields.
+   * True when this person is an active member of any OTHER cooperative.
+   * Their name belongs to their account, not to this cooperative, so
+   * while they are in more than one, only they may change it.
+   */
+  async isIdentityShared(tenantId: string, userId: string): Promise<boolean> {
+    const elsewhere = await this.tenantUsersRepository.count({
+      where: { userId, isActive: true, tenantId: Not(tenantId) },
+    });
+    return elsewhere > 0;
+  }
+
+  /**
+   * Corrects a member's name. Names only: phone number is how the person
+   * signs in (changing it needs their own verification, which comes with
+   * phone sign-in), and deactivating has its own endpoint with its own
+   * safeguards — this one must not be a way around them.
    */
   async updateTenantUser(
     tenantId: string,
@@ -381,17 +437,18 @@ async createWithTemporaryPassword(params: {
   ): Promise<TenantUser> {
     return await this.dataSource.transaction(async (manager) => {
       const tenantUser = await manager.findOne(TenantUser, {
-        where: {
-          userId: tenantUserId,
-          tenantId,
-        },
-        relations: {
-          user: true,
-        },
+        where: { id: tenantUserId, tenantId },
+        relations: { user: true },
       });
 
       if (!tenantUser) {
         throw new NotFoundException('Tenant user not found.');
+      }
+
+      if (await this.isIdentityShared(tenantId, tenantUser.userId)) {
+        throw new ForbiddenException(
+          'This person belongs to other cooperatives too, so only they can change their name.',
+        );
       }
 
       if (dto.firstName !== undefined) {
@@ -402,16 +459,7 @@ async createWithTemporaryPassword(params: {
         tenantUser.user.lastName = dto.lastName.trim();
       }
 
-      if (dto.isActive !== undefined) {
-        tenantUser.isActive = dto.isActive;
-        tenantUser.status = dto.isActive ? 'active' : 'suspended';
-      }
-
-      console.log(`Current User's Firstname ${tenantUser.user.firstName}`);
-
-
       await manager.save(User, tenantUser.user);
-      await manager.save(TenantUser, tenantUser);
 
       await this.identityOutboxService.publish({
         manager,
@@ -425,8 +473,6 @@ async createWithTemporaryPassword(params: {
           userId: tenantUser.user.id,
           firstName: tenantUser.user.firstName,
           lastName: tenantUser.user.lastName,
-          isActive: tenantUser.isActive,
-          status: tenantUser.status,
         },
       });
 
@@ -441,7 +487,14 @@ async createWithTemporaryPassword(params: {
   }
 
   /**
-   * Soft-deactivates a user membership in the current tenant.
+   * Takes someone out of the cooperative's day-to-day: they can no longer
+   * sign in to it, and their open session ends when its access token next
+   * refreshes (within about 15 minutes). Nothing is deleted — their
+   * savings, loans and history stay exactly as they were, and they can be
+   * reactivated.
+   *
+   * Refused for yourself, for an administrator unless you are one, and
+   * for the last active administrator.
    */
   async deactivateTenantUser(
     tenantId: string,
@@ -449,19 +502,29 @@ async createWithTemporaryPassword(params: {
     actorUserId?: string,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+      await lockCooperative(manager, tenantId);
+
       const tenantUser = await manager.findOne(TenantUser, {
-        where: {
-          id: tenantUserId,
-          tenantId,
-        },
-        relations: {
-          user: true,
-        },
+        where: { id: tenantUserId, tenantId },
+        relations: { user: true },
       });
 
       if (!tenantUser) {
         throw new NotFoundException('Tenant user not found.');
       }
+
+      const actor = await loadActor(manager, tenantId, actorUserId);
+
+      const violation = checkDeactivation({
+        actorTenantUserId: actor.tenantUserId,
+        targetTenantUserId: tenantUser.id,
+        actorRoleCodes: actor.roleCodes,
+        targetRoleCodes: await loadRoleCodes(manager, tenantUser.id),
+        targetIsActive: tenantUser.isActive !== false,
+        targetStatus: tenantUser.status,
+        otherActiveAdmins: await countOtherActiveAdmins(manager, tenantId, tenantUser.id),
+      });
+      if (violation) throwViolation(violation);
 
       tenantUser.isActive = false;
       tenantUser.status = 'suspended';
@@ -479,6 +542,57 @@ async createWithTemporaryPassword(params: {
           tenantUserId: tenantUser.id,
           userId: tenantUser.user.id,
         },
+      });
+    });
+  }
+
+  /**
+   * Undoes a deactivation. Roles were never removed, so the person comes
+   * back exactly as they were.
+   */
+  async reactivateTenantUser(
+    tenantId: string,
+    tenantUserId: string,
+    actorUserId?: string,
+  ): Promise<TenantUser> {
+    return await this.dataSource.transaction(async (manager) => {
+      await lockCooperative(manager, tenantId);
+
+      const tenantUser = await manager.findOne(TenantUser, {
+        where: { id: tenantUserId, tenantId },
+        relations: { user: true },
+      });
+
+      if (!tenantUser) {
+        throw new NotFoundException('Tenant user not found.');
+      }
+
+      await loadActor(manager, tenantId, actorUserId);
+
+      const violation = checkReactivation({ isActive: tenantUser.isActive !== false, status: tenantUser.status });
+      if (violation) throwViolation(violation);
+
+      tenantUser.isActive = true;
+      tenantUser.status = 'active';
+
+      await manager.save(TenantUser, tenantUser);
+
+      await this.identityOutboxService.publish({
+        manager,
+        tenantId,
+        aggregateId: tenantUser.id,
+        aggregateType: 'tenant_user',
+        eventType: 'identity.tenant_user.reactivated.v1',
+        actorUserId,
+        payload: {
+          tenantUserId: tenantUser.id,
+          userId: tenantUser.user.id,
+        },
+      });
+
+      return await manager.findOneOrFail(TenantUser, {
+        where: { id: tenantUser.id, tenantId },
+        relations: { user: true, roles: { role: true } },
       });
     });
   }

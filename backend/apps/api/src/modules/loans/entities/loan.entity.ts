@@ -52,20 +52,20 @@ export class Loan extends BaseEntity {
   principalAmount!: string;
 
   // --- Self-funded tranche ---
-  @Column({ type: "numeric", precision: 18, scale: 2, default: "0.00" })
+  @Column({ type: "numeric", precision: 18, scale: 2, default: () => "0.00" })
   selfFundedPrincipal!: string;
 
-  @Column({ type: "numeric", precision: 18, scale: 2, default: "0.00" })
+  @Column({ type: "numeric", precision: 18, scale: 2, default: () => "0.00" })
   selfFundedOutstandingPrincipal!: string;
 
   @Column({ type: "numeric", precision: 5, scale: 2 })
   selfFundedMonthlyRate!: string;
 
   // --- Peer-funded tranche ---
-  @Column({ type: "numeric", precision: 18, scale: 2, default: "0.00" })
+  @Column({ type: "numeric", precision: 18, scale: 2, default: () => "0.00" })
   peerFundedPrincipal!: string;
 
-  @Column({ type: "numeric", precision: 18, scale: 2, default: "0.00" })
+  @Column({ type: "numeric", precision: 18, scale: 2, default: () => "0.00" })
   peerFundedOutstandingPrincipal!: string;
 
   /** Current rate, escalates monthly up to peerCapRate. */

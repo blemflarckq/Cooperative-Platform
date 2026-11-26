@@ -6,3 +6,12 @@ export const tenantUserQueryKeys = {
   detail: (tenantUserId: string) =>
     [...tenantUserQueryKeys.details(), tenantUserId] as const,
 };
+
+/**
+ * The cooperative's roles. Their own key, deliberately outside
+ * "tenant-users": changing a member's roles must not make the roles list
+ * itself refetch.
+ */
+export const tenantRoleQueryKeys = {
+  all: ["tenant-roles"] as const,
+};

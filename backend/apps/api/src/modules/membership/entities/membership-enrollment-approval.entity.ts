@@ -1,4 +1,4 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from "typeorm";
 import { BaseEntity } from "../../../common/db/base.entity";
 import { MembershipEnrollmentRequest } from "./membership-enrollment-request.entity";
 import { TenantUser } from "../../identity/entities/tenant-user.entity";
@@ -12,7 +12,7 @@ import { ApprovalDecision } from "../../schemes/enums/governance.enums";
  * ApprovalDecision enum rather than inventing an equivalent one.
  */
 @Entity("membership_enrollment_approvals")
-@Index(["enrollmentRequestId", "approverTenantUserId"], { unique: true })
+@Unique("UQ_enrollment_approval_once", ["enrollmentRequestId", "approverTenantUserId"])
 export class MembershipEnrollmentApproval extends BaseEntity {
   @Column("uuid")
   enrollmentRequestId!: string;
@@ -20,14 +20,14 @@ export class MembershipEnrollmentApproval extends BaseEntity {
   @ManyToOne(() => MembershipEnrollmentRequest, (request) => request.approvals, {
     onDelete: "CASCADE",
   })
-  @JoinColumn({ name: "enrollmentRequestId" })
+  @JoinColumn({ name: "enrollmentRequestId", foreignKeyConstraintName: "FK_enrollment_approval_request" })
   enrollmentRequest!: MembershipEnrollmentRequest;
 
   @Column("uuid")
   approverTenantUserId!: string;
 
   @ManyToOne(() => TenantUser, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "approverTenantUserId" })
+  @JoinColumn({ name: "approverTenantUserId", foreignKeyConstraintName: "FK_enrollment_approval_approver" })
   approver!: TenantUser;
 
   @Column({ type: "enum", enum: ApprovalDecision })

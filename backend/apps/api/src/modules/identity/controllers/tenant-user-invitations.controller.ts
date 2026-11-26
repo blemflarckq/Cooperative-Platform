@@ -25,7 +25,6 @@ export class TenantUserInvitationsController {
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: InviteTenantUserDto,
   ) {
-    console.log("The request from the frontend has the following", dto);
     return this.invitationsService.inviteTenantUser({
       tenantId,
       actorUserId,

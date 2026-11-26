@@ -4,7 +4,6 @@ import { Search, UserCog } from "lucide-react";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
 import { PermissionGate } from "@/components/common/PermissionGate";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
@@ -16,6 +15,7 @@ import { formatDate } from "@/lib/formatting/date";
 import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 import { InviteMemberDialog } from "@/features/membership/components/InviteMemberDialog";
 import { PendingEnrollmentsSection } from "@/features/membership/components/PendingEnrollmentsSection";
+import { MemberStatusBadge } from "@/features/tenant-users/components/MemberStatusBadge";
 import { RoleChips } from "@/features/tenant-users/components/RoleChips";
 import { useTenantUsers } from "@/features/tenant-users/hooks/useTenantUsers";
 import type { TenantUserListItem } from "@/features/tenant-users/types/tenant-user.types";
@@ -122,7 +122,7 @@ function MemberCard({ member, onOpen }: { member: TenantUserListItem; onOpen: ()
               {member.mobileMasked ?? "No phone number"}
             </div>
           </div>
-          <StatusBadge status={member.status.toUpperCase()} />
+          <MemberStatusBadge member={member} />
         </div>
 
         <div className="mt-2.5 flex flex-wrap gap-1.5">

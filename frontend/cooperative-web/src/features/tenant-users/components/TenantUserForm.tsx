@@ -1,88 +1,72 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   tenantUserSchema,
   type TenantUserFormValues,
 } from "@/features/tenant-users/schemas/tenant-user.schema";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 interface TenantUserFormProps {
   defaultValues?: Partial<TenantUserFormValues>;
   onSubmit: (values: TenantUserFormValues) => void;
+  onCancel?: () => void;
   isLoading?: boolean;
   submitLabel?: string;
 }
 
+/**
+ * A member's name — first and last. Nothing else is editable here:
+ * email and phone are how people sign in, and deactivating has its own
+ * safeguarded route.
+ */
 export function TenantUserForm({
   defaultValues,
   onSubmit,
+  onCancel,
   isLoading,
-  submitLabel = "Save Member",
+  submitLabel = "Save changes",
 }: TenantUserFormProps) {
   const form = useForm<TenantUserFormValues>({
     resolver: zodResolver(tenantUserSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      ...defaultValues,
-    },
+    defaultValues: { firstName: "", lastName: "", ...defaultValues },
   });
+  const { errors } = form.formState;
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-3xl">
-      <Card className="border-border bg-white">
-        <CardHeader>
-          <CardTitle className="text-lg">User Identity</CardTitle>
-        </CardHeader>
+    <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+      <Card className="gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0">
+        <div className="space-y-1.5">
+          <label htmlFor="firstName" className="text-sm font-medium">
+            First name
+          </label>
+          <Input id="firstName" autoComplete="off" {...form.register("firstName")} />
+          {errors.firstName ? (
+            <p className="text-xs text-[var(--destructive)]">{errors.firstName.message}</p>
+          ) : null}
+        </div>
 
-        <CardContent className="space-y-5">
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                First Name
-              </label>
-              <Input {...form.register("firstName")} />
-              {form.formState.errors.firstName ? (
-                <p className="text-xs text-red-600">
-                  {form.formState.errors.firstName.message}
-                </p>
-              ) : null}
-            </div>
+        <div className="space-y-1.5">
+          <label htmlFor="lastName" className="text-sm font-medium">
+            Last name
+          </label>
+          <Input id="lastName" autoComplete="off" {...form.register("lastName")} />
+          {errors.lastName ? (
+            <p className="text-xs text-[var(--destructive)]">{errors.lastName.message}</p>
+          ) : null}
+        </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Last Name
-              </label>
-              <Input {...form.register("lastName")} />
-              {form.formState.errors.lastName ? (
-                <p className="text-xs text-red-600">
-                  {form.formState.errors.lastName.message}
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">
-                Email
-              </label>
-              <Input type="email" {...form.register("email")} />
-              {form.formState.errors.email ? (
-                <p className="text-xs text-red-600">
-                  {form.formState.errors.email.message}
-                </p>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="flex justify-end border-t border-border pt-5">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : submitLabel}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              Cancel
             </Button>
-          </div>
-        </CardContent>
+          ) : null}
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Saving…" : submitLabel}
+          </Button>
+        </div>
       </Card>
     </form>
   );

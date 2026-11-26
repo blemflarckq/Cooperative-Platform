@@ -1,81 +1,100 @@
-import { /*useNavigate,*/ useParams } from "react-router";
-import { toast } from "sonner";
+import { useParams } from "react-router";
+
+import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
-import { getApiErrorMessage } from "@/lib/api/api-error";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 import { TenantUserForm } from "@/features/tenant-users/components/TenantUserForm";
 import { useTenantUser } from "@/features/tenant-users/hooks/useTenantUser";
 import { useUpdateTenantUser } from "@/features/tenant-users/hooks/useUpdateTenantUser";
 import type { TenantUserFormValues } from "@/features/tenant-users/schemas/tenant-user.schema";
-import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 
+/**
+ * Correcting how someone's name appears. Names only: email and phone are
+ * how people sign in, so they're not editable here — and when the person
+ * belongs to other cooperatives too, their name isn't this cooperative's
+ * to change at all. The page says which of those applies instead of
+ * offering a form that would be refused.
+ */
 export function EditTenantUserPage() {
   const { tenantUserId } = useParams();
-  //const navigate = useNavigate();
-  const { navigateToApp } = useTenantNavigation();
-  const { appPath } = useTenantNavigation();
+  const { navigateToApp, appPath } = useTenantNavigation();
 
+  const memberQuery = useTenantUser(tenantUserId!);
+  const update = useUpdateTenantUser();
 
-  const tenantUserQuery = useTenantUser(tenantUserId!);
-  const updateTenantUserMutation = useUpdateTenantUser();
-
-  if (tenantUserQuery.isLoading) return <LoadingState />;
-
-  if (tenantUserQuery.isError || !tenantUserQuery.data) {
+  if (memberQuery.isLoading) {
     return (
-      <ErrorState
-        title="Could not load member"
-        description="The tenant membership could not be loaded for editing."
-      />
+      <PageContainer>
+        <LoadingState />
+      </PageContainer>
     );
   }
 
-  const tenantUser = tenantUserQuery.data;
+  if (memberQuery.isError || !memberQuery.data) {
+    return (
+      <PageContainer>
+        <ErrorState
+          title="Could not load this member"
+          description="Go back and try again."
+        />
+      </PageContainer>
+    );
+  }
+
+  const member = memberQuery.data;
+  const memberPath = `/members/${member.id}`;
+  const firstName = member.firstName || member.fullName;
 
   function handleSubmit(values: TenantUserFormValues) {
-    updateTenantUserMutation.mutate(
-      {
-        tenantUserId: tenantUser.id,
-        values,
-      },
-      {
-        onSuccess: () => {
-          toast.success("Member updated successfully");
-          navigateToApp(`/members/${tenantUser.id}`);
-        },
-      },
+    update.mutate(
+      { tenantUserId: member.id, values },
+      { onSuccess: () => navigateToApp(memberPath) },
     );
   }
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        title="Edit Member"
-        description={`Update the user identity record for ${tenantUser.fullName}.`}
-        backTo={appPath(`/members/${tenantUser.id}`)}
-        backLabel="Back to Member"
+        title="Edit name"
+        description={
+          member.identityShared
+            ? undefined
+            : `Correct how ${member.fullName} appears in the cooperative.`
+        }
+        backTo={appPath(memberPath)}
+        backLabel={member.fullName}
       />
 
-      {updateTenantUserMutation.isError ? (
-        <div className="mb-6">
-          <ErrorState
-            title="Could not update member"
-            description={getApiErrorMessage(updateTenantUserMutation.error)}
+      {member.identityShared ? (
+        <Card className="gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0">
+          <h2 className="text-sm font-medium">Only {firstName} can change this</h2>
+          <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+            {firstName} belongs to other cooperatives too, and their name is the same in all of
+            them, so no single cooperative can change it.
+          </p>
+          <div>
+            <Button variant="outline" onClick={() => navigateToApp(memberPath)}>
+              Back to {firstName}
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <TenantUserForm
+            defaultValues={{ firstName: member.firstName, lastName: member.lastName }}
+            onSubmit={handleSubmit}
+            onCancel={() => navigateToApp(memberPath)}
+            isLoading={update.isPending}
           />
-        </div>
-      ) : null}
-
-      <TenantUserForm
-        defaultValues={{
-          firstName: tenantUser.firstName,
-          lastName: tenantUser.lastName,
-          email: tenantUser.email,
-        }}
-        onSubmit={handleSubmit}
-        isLoading={updateTenantUserMutation.isPending}
-        submitLabel="Update Member"
-      />
-    </div>
+          <p className="text-xs leading-5 text-[var(--muted-foreground)]">
+            Email and phone number are how people sign in, so they can't be changed here.
+          </p>
+        </>
+      )}
+    </PageContainer>
   );
 }

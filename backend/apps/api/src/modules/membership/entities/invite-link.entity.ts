@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from "typeorm";
 import { BaseEntity } from "../../../common/db/base.entity";
 import { TenantUser } from "../../identity/entities/tenant-user.entity";
 
@@ -15,18 +15,19 @@ import { TenantUser } from "../../identity/entities/tenant-user.entity";
  * enrollment, is expected to happen inside this same window.
  */
 @Entity("invite_links")
+@Unique("UQ_invite_links_token", ["token"])
 export class InviteLink extends BaseEntity {
   @Column("uuid")
   tenantId!: string;
 
-  @Column({ unique: true })
+  @Column()
   token!: string;
 
   @Column("uuid")
   generatedByTenantUserId!: string;
 
   @ManyToOne(() => TenantUser, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "generatedByTenantUserId" })
+  @JoinColumn({ name: "generatedByTenantUserId", foreignKeyConstraintName: "FK_invite_links_generated_by" })
   generatedBy!: TenantUser;
 
   @Column({ type: "timestamptz" })

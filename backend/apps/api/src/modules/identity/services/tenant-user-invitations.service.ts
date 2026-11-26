@@ -20,6 +20,7 @@ import { AcceptInvitationDto } from '../dto/accept-invitation.dto';
 import { IdentityOutboxService } from './identity-outbox.service';
 import { hashPassword } from '../../../common/auth/password';
 import { UnauthorizedException } from '@nestjs/common';
+import { assertMayGrantInitialRoles } from './tenant-user-governance';
 
 @Injectable()
 export class TenantUserInvitationsService {
@@ -121,6 +122,8 @@ export class TenantUserInvitationsService {
             'One or more roles are invalid for this tenant.',
           );
         }
+
+        await assertMayGrantInitialRoles(manager, tenantId, actorUserId, roles);
 
         const roleRows = roles.map((role) =>
           manager.create(TenantUserRole, {

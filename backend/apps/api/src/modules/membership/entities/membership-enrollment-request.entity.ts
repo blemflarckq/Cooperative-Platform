@@ -19,7 +19,7 @@ import { MembershipEnrollmentApproval } from "./membership-enrollment-approval.e
  * the invite link itself was generated for.
  */
 @Entity("membership_enrollment_requests")
-@Index(["tenantId", "status"])
+@Index("IDX_enrollment_tenant_status", ["tenantId", "status"])
 export class MembershipEnrollmentRequest extends BaseEntity {
   @Column("uuid")
   tenantId!: string;
@@ -28,14 +28,14 @@ export class MembershipEnrollmentRequest extends BaseEntity {
   inviteLinkId!: string;
 
   @ManyToOne(() => InviteLink, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "inviteLinkId" })
+  @JoinColumn({ name: "inviteLinkId", foreignKeyConstraintName: "FK_enrollment_invite_link" })
   inviteLink!: InviteLink;
 
   @Column("uuid")
   userId!: string;
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "userId" })
+  @JoinColumn({ name: "userId", foreignKeyConstraintName: "FK_enrollment_user" })
   user!: User;
 
   @Column({

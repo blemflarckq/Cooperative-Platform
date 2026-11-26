@@ -88,8 +88,12 @@ export class TenantUsersController {
       tenantId,
       tenantUserId,
     );
+    const [schemeNames, identityShared] = await Promise.all([
+      this.tenantUsersService.getActiveSchemeNames(tenantId, entity.id),
+      this.tenantUsersService.isIdentityShared(tenantId, entity.userId),
+    ]);
 
-    return TenantUserResponseMapper.toResponse(entity);
+    return TenantUserResponseMapper.toResponse(entity, schemeNames, identityShared);
   }
 
   @Patch(':tenantUserId')
@@ -100,8 +104,6 @@ export class TenantUsersController {
     @Param('tenantUserId') tenantUserId: string,
     @Body() dto: UpdateTenantUserDto,
   ) {
-    console.log('The Current TenantUser issdf', JSON.stringify(dto, null, 2));
-
     const entity = await this.tenantUsersService.updateTenantUser(
       tenantId,
       tenantUserId,
@@ -129,6 +131,22 @@ export class TenantUsersController {
       success: true,
       message: 'Tenant user deactivated successfully.',
     };
+  }
+
+  @Post(':tenantUserId/reactivate')
+  @RequirePermissions('user:activate')
+  async reactivate(
+    @TenantId() tenantId: string,
+    @CurrentUser() actorUserId: string,
+    @Param('tenantUserId') tenantUserId: string,
+  ) {
+    const entity = await this.tenantUsersService.reactivateTenantUser(
+      tenantId,
+      tenantUserId,
+      actorUserId,
+    );
+
+    return TenantUserResponseMapper.toResponse(entity);
   }
 
   @Post('temp-password')

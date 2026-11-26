@@ -3,12 +3,19 @@ import { TenantUserRolesService } from '../services/tenant-user-roles.service';
 import { AssignRolesDto } from '../dto/assign-roles.dto';
 import { ReplaceRolesDto } from '../dto/replace-roles.dto';
 
-// Replace these imports with your actual decorators/guards if names differ.
 import { TenantId } from '../../../common/tenancy/tenant-id.decorator';
 import { CurrentUser } from '../../../common/auth/current-user.decorator';
 import { RequirePermissions } from '../../../common/rbac/require-permissions.decorator';
 import { TenantUserResponseMapper } from '../mappers/tenant-user-response.mapper';
 
+/**
+ * All three verbs need `user:assign-role` — a permission that already
+ * exists and is held by administrators and treasurers. (They previously
+ * asked for three `tenant_user_roles:*` codes that were never created,
+ * so nobody could use them.) What a given person may actually do with it
+ * is narrowed further inside the service: not your own roles, and the
+ * administrator role only by an administrator.
+ */
 @Controller('tenant-users/:tenantUserId/roles')
 export class TenantUserRolesController {
   constructor(
@@ -16,7 +23,7 @@ export class TenantUserRolesController {
   ) {}
 
   @Post('assign')
-  @RequirePermissions('tenant_user_roles:assign')
+  @RequirePermissions('user:assign-role')
   async assign(
     @TenantId() tenantId: string,
     @CurrentUser('sub') actorUserId: string,
@@ -34,7 +41,7 @@ export class TenantUserRolesController {
   }
 
   @Post('revoke')
-  @RequirePermissions('tenant_user_roles:revoke')
+  @RequirePermissions('user:assign-role')
   async revoke(
     @TenantId() tenantId: string,
     @CurrentUser('sub') actorUserId: string,
@@ -52,7 +59,7 @@ export class TenantUserRolesController {
   }
 
   @Put()
-  @RequirePermissions('tenant_user_roles:replace')
+  @RequirePermissions('user:assign-role')
   async replace(
     @TenantId() tenantId: string,
     @CurrentUser('sub') actorUserId: string,

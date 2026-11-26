@@ -15,6 +15,7 @@ import { OutboxModule } from "../../common/messaging/outbox.module";
 import { TenantUsersController } from "./controllers/tenant-users.controller";
 import { TenantUserRolesController } from "./controllers/tenant-user-roles.controller";
 import { TenantUserInvitationsController } from "./controllers/tenant-user-invitations.controller";
+import { RolesController } from "./controllers/roles.controller";
 
 import { TenantUsersService } from "./services/tenant-users.service";
 import { TenantUserRolesService } from "./services/tenant-user-roles.service";
@@ -44,6 +45,7 @@ import { TenantUserInvitationsService } from "./services/tenant-user-invitations
     TenantUsersController,
     TenantUserRolesController,
     TenantUserInvitationsController,
+    RolesController,
   ],
   providers: [
     TenantUsersService,

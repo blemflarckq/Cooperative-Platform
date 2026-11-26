@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 import { syncTenantUserRoles } from "@/features/tenant-users/api/tenant-users.api";
 import { tenantUserQueryKeys } from "@/features/tenant-users/hooks/tenant-user-query-keys";
 
@@ -18,10 +20,9 @@ export function useSyncTenantUserRoles() {
       await queryClient.invalidateQueries({
         queryKey: tenantUserQueryKeys.detail(tenantUser.id),
       });
-
-      await queryClient.invalidateQueries({
-        queryKey: tenantUserQueryKeys.lists(),
-      });
+      await queryClient.invalidateQueries({ queryKey: tenantUserQueryKeys.lists() });
+      toast.success("Roles updated");
     },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 }

@@ -2,7 +2,17 @@ import { TenantUser } from '../entities/tenant-user.entity';
 import { maskMobile } from '../../../common/utils/mask-mobile';
 
 export class TenantUserResponseMapper {
-  static toResponse(entity: TenantUser, schemeNames: string[] = []) {
+  /**
+   * `identityShared` is only passed by the single-member endpoint — it
+   * costs a query, so the list doesn't compute it. When absent it is
+   * omitted from the response entirely rather than sent as a false that
+   * would be wrong.
+   */
+  static toResponse(
+    entity: TenantUser,
+    schemeNames: string[] = [],
+    identityShared?: boolean,
+  ) {
     return {
       id: entity.id,
       tenantId: entity.tenantId,
@@ -32,6 +42,7 @@ export class TenantUserResponseMapper {
           description: tur.role?.description,
         })) ?? [],
       schemeNames,
+      ...(identityShared === undefined ? {} : { identityShared }),
     };
   }
 }
