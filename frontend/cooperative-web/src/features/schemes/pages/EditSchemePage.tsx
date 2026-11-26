@@ -1,90 +1,122 @@
-import { useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
+import { useParams } from "react-router";
+
+import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
-import { getApiErrorMessage } from "@/lib/api/api-error";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
+
 import { SchemeForm } from "../components/SchemeForm";
 import { useScheme } from "../hooks/useScheme";
+import { useSchemeWords } from "../hooks/useSchemeWords";
 import { useUpdateScheme } from "../hooks/useUpdateScheme";
 import type { SchemeFormValues } from "../schemas/scheme.schema";
+import type { UpdateSchemeRequest } from "../types/scheme.types";
+import { isStructureLocked } from "../utils/scheme-state";
 
+/**
+ * Changing a scheme. The name and description can always change. The code
+ * and the four rules can only change while it's still a draft — after
+ * that they're shown, with the reason, instead of offered. Only what
+ * actually changed is sent, so saving a new name can never be refused
+ * because of a rule the person never touched.
+ */
 export function EditSchemePage() {
   const { schemeId } = useParams<{ schemeId: string }>();
-
-  const navigate = useNavigate();
-  const { appPath } = useTenantNavigation();
+  const { navigateToApp, appPath } = useTenantNavigation();
+  const words = useSchemeWords();
 
   const schemeQuery = useScheme(schemeId!);
-  const mutation = useUpdateScheme();
+  const update = useUpdateScheme();
 
-  if (schemeQuery.isLoading) return <LoadingState />;
+  if (schemeQuery.isLoading) {
+    return (
+      <PageContainer>
+        <LoadingState />
+      </PageContainer>
+    );
+  }
 
   if (schemeQuery.isError || !schemeQuery.data) {
-    return <ErrorState title="Could not load scheme" />;
+    return (
+      <PageContainer>
+        <ErrorState
+          title={`Could not load this ${words.noun}`}
+          description="Go back and try again."
+        />
+      </PageContainer>
+    );
   }
 
   const scheme = schemeQuery.data;
+  const schemePath = `/schemes/${scheme.id}`;
 
-  function cleanSchemePayload(values: SchemeFormValues) {
-    return {
-      ...values,
-      code: values.code?.trim() ? values.code.trim() : undefined,
-      description: values.description?.trim()
-        ? values.description.trim()
-        : undefined,
-    };
-  }
+  function handleSubmit(values: SchemeFormValues, changed: Array<keyof SchemeFormValues>) {
+    const payload: UpdateSchemeRequest = {};
+    for (const key of changed) {
+      if (key === "name") payload.name = values.name;
+      else if (key === "description") payload.description = values.description?.trim() ?? "";
+      else if (key === "code") {
+        // A blank code means "make it from the name" on create; on edit, leaving it as it was.
+        if (values.code?.trim()) payload.code = values.code.trim();
+      } else {
+        (payload as Record<string, string>)[key] = values[key];
+      }
+    }
 
-  function handleSubmit(values: SchemeFormValues) {
-    mutation.mutate(
-      {
-        schemeId: scheme.id,
-        values: cleanSchemePayload(values),
-      },
-      {
-        onSuccess: () => {
-          toast.success("Scheme updated successfully");
+    if (Object.keys(payload).length === 0) {
+      navigateToApp(schemePath);
+      return;
+    }
 
-          navigate(appPath(`/schemes/${scheme.id}`));
-        },
-      },
+    update.mutate(
+      { schemeId: scheme.id, values: payload },
+      { onSuccess: () => navigateToApp(schemePath) },
     );
   }
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        title={`Edit ${scheme.name}`}
-        description="Update cooperative scheme configuration and policy behavior."
-        backTo={`/schemes/${scheme.id}`}
-        backLabel="Back to Scheme"
+        title={`Edit ${words.noun}`}
+        backTo={appPath(schemePath)}
+        backLabel={scheme.name}
       />
 
-      {mutation.isError ? (
-        <div className="mb-6">
-          <ErrorState
-            title="Could not update scheme"
-            description={getApiErrorMessage(mutation.error)}
-          />
-        </div>
-      ) : null}
-
-      <SchemeForm
-        defaultValues={{
-          name: scheme.name,
-          code: scheme.code,
-          description: scheme.description ?? "",
-          cycleMode: scheme.cycleMode,
-          contributionMode: scheme.contributionMode,
-          loanMode: scheme.loanMode,
-          payoutMode: scheme.payoutMode,
-        }}
-        onSubmit={handleSubmit}
-        isLoading={mutation.isPending}
-        submitLabel="Save Changes"
-      />
-    </div>
+      {scheme.status === "ARCHIVED" ? (
+        <Card className="gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0">
+          <h2 className="text-sm font-medium">This {words.noun} is archived</h2>
+          <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+            Archived is closed for good, and nothing about it can be changed. Its history is kept.
+          </p>
+          <div>
+            <Button variant="outline" onClick={() => navigateToApp(schemePath)}>
+              Back to {scheme.name}
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <SchemeForm
+          defaultValues={{
+            name: scheme.name,
+            code: scheme.code,
+            description: scheme.description ?? "",
+            cycleMode: scheme.cycleMode,
+            contributionMode: scheme.contributionMode,
+            loanMode: scheme.loanMode,
+            payoutMode: scheme.payoutMode,
+          }}
+          structureLocked={isStructureLocked(scheme.status)}
+          requireChange
+          submitLabel="Save changes"
+          savingLabel="Saving…"
+          isLoading={update.isPending}
+          onSubmit={handleSubmit}
+          onCancel={() => navigateToApp(schemePath)}
+        />
+      )}
+    </PageContainer>
   );
 }

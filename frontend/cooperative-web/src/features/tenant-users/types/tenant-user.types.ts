@@ -25,6 +25,12 @@ export interface TenantUserResponse {
   } | null;
   roles: TenantRoleSummary[];
   schemeNames: string[];
+  /**
+   * Only present on the single-member response. True when this person is
+   * also an active member of another cooperative — their name belongs to
+   * their account, so only they may change it.
+   */
+  identityShared?: boolean;
 }
 
 export interface TenantUserListItem {
@@ -43,6 +49,7 @@ export interface TenantUserListItem {
   roles: TenantRoleSummary[];
   mobileMasked: string | null;
   schemeNames: string[];
+  identityShared?: boolean;
 }
 
 //export interface TenantUserDetails extends TenantUserListItem {}
@@ -56,10 +63,24 @@ export interface CreateTenantUserRequest {
   roleIds?: string[];
 }
 
+/** Names only — everything else about a member has its own, safeguarded route. */
 export interface UpdateTenantUserRequest {
   firstName: string;
   lastName: string;
-  email: string;
+}
+
+/**
+ * A role the cooperative has, as seen by the person about to give it out.
+ * `canAssign` is decided by the server (who may hand out which role);
+ * when false, `lockedReason` is the plain-language reason to show in place.
+ */
+export interface TenantRoleOption {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  canAssign: boolean;
+  lockedReason: string | null;
 }
 
 export interface SyncTenantUserRolesRequest {

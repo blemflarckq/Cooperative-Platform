@@ -11,6 +11,8 @@ import { MemberBalanceService } from "./member-balance.service";
 import { ActorTenantUserResolverService } from "../../schemes/services/actor-tenant-user-resolver.service";
 import { OutboundRequestsService } from "../../schemes/services/outbound-requests.service";
 import { OperatingCyclesService } from "../../schemes/services/operating-cycles.service";
+import { assertSchemeAcceptsNewActivity } from "../../schemes/services/scheme-governance";
+import { LoanMode } from "../../schemes/enums/scheme.enums";
 
 export interface RequestLoanInput {
   amount: string;
@@ -144,6 +146,14 @@ export class LoansService {
       if (!scheme) {
         throw new NotFoundException("Scheme not found.");
       }
+
+      if (scheme.loanMode === LoanMode.DISABLED) {
+        throw new BadRequestException("This scheme doesn't offer loans.");
+      }
+
+      // Suspended or archived schemes take no new loan requests. Repaying
+      // existing loans is a different path and is never blocked.
+      await assertSchemeAcceptsNewActivity(manager, tenantId, schemeId);
 
       const cycle = await this.operatingCyclesService.resolveCurrentCycle(
         manager,

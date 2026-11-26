@@ -1,4 +1,11 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { Transform } from "class-transformer";
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from "class-validator";
 import {
   ContributionMode,
   CycleMode,
@@ -7,7 +14,9 @@ import {
 } from "../../enums/scheme.enums";
 
 export class CreateSchemeDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
+  @IsNotEmpty({ message: "A scheme needs a name." })
   @MaxLength(160)
   name!: string;
 
@@ -18,6 +27,7 @@ export class CreateSchemeDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 
   @IsEnum(CycleMode)

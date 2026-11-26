@@ -20,6 +20,14 @@ export type PayoutMode =
   | "EVENT_BENEFICIARY"
   | "PROJECT_EXPENSE";
 
+/** What still stands in the way of archiving a scheme. Only on the single-scheme response. */
+export interface ArchiveBlockers {
+  /** Cycles that are open or paused. */
+  runningCycles: number;
+  /** Loans not yet fully repaid, including requests still being approved. */
+  unpaidLoans: number;
+}
+
 export interface Scheme {
   id: string;
   tenantId: string;
@@ -31,8 +39,10 @@ export interface Scheme {
   contributionMode: ContributionMode;
   loanMode: LoanMode;
   payoutMode: PayoutMode;
+  activatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  archiveBlockers?: ArchiveBlockers;
 }
 
 export interface CreateSchemeRequest {
@@ -45,4 +55,11 @@ export interface CreateSchemeRequest {
   payoutMode: PayoutMode;
 }
 
-export type UpdateSchemeRequest = Partial<CreateSchemeRequest>
+export type UpdateSchemeRequest = Partial<CreateSchemeRequest>;
+
+/** The four rules a scheme runs by. Fixed once the scheme is activated. */
+export type SchemeModeField =
+  | "cycleMode"
+  | "contributionMode"
+  | "loanMode"
+  | "payoutMode";

@@ -1,234 +1,153 @@
-import { type ExperienceMode } from "@/lib/experience/experience-mode";
+import type { ExperienceMode } from "@/lib/experience/experience-mode";
+import type { SchemeModeField } from "../types/scheme.types";
 
-type LabelSet = {
+export interface ModeOption {
   label: string;
-  description?: string;
+  description: string;
+}
+
+export const MODE_FIELDS: SchemeModeField[] = [
+  "cycleMode",
+  "contributionMode",
+  "loanMode",
+  "payoutMode",
+];
+
+/** The name of each rule. Community says what it decides; professional uses the system's own term. */
+export function getModeHeading(mode: ExperienceMode, field: SchemeModeField): string {
+  if (mode === "professional") {
+    return {
+      cycleMode: "Cycle mode",
+      contributionMode: "Contribution mode",
+      loanMode: "Loan mode",
+      payoutMode: "Payout mode",
+    }[field];
+  }
+
+  return {
+    cycleMode: "How long it runs",
+    contributionMode: "How people contribute",
+    loanMode: "Loans",
+    payoutMode: "What happens to the money",
+  }[field];
+}
+
+const professional: Record<SchemeModeField, Record<string, ModeOption>> = {
+  cycleMode: {
+    FIXED_PERIOD: { label: "Fixed period", description: "Runs for a defined start and end." },
+    OPEN_ENDED: { label: "Open ended", description: "Continues until it is stopped." },
+    PROJECT_BASED: { label: "Project based", description: "Linked to a project or a target." },
+  },
+  contributionMode: {
+    MONTHLY_FIXED: { label: "Monthly fixed", description: "Members contribute a fixed amount each month." },
+    EVENT_TRIGGERED: { label: "Event triggered", description: "Contributions are requested when an event happens." },
+    VOLUNTARY: { label: "Voluntary", description: "Members contribute when they can." },
+    PROJECT_TARGET: { label: "Project target", description: "Contributions are collected toward a target." },
+  },
+  loanMode: {
+    DISABLED: { label: "Disabled", description: "Loans are not offered." },
+    SELF_BACKED: { label: "Self-backed", description: "Loans are backed by the member's own savings." },
+    PEER_FUNDED: { label: "Peer-funded", description: "Loans are backed by pledges from other members." },
+    SELF_AND_PEER_FUNDED: {
+      label: "Self- and peer-funded",
+      description: "Loans use the member's own savings first, then pledges from others.",
+    },
+  },
+  payoutMode: {
+    END_OF_CYCLE: { label: "End of cycle", description: "Money is shared out when the cycle ends." },
+    NO_PAYOUT: { label: "No payout", description: "Money stays in the fund." },
+    EVENT_BENEFICIARY: { label: "Event beneficiary", description: "Money is paid to a beneficiary when an event occurs." },
+    PROJECT_EXPENSE: { label: "Project expense", description: "Money is spent on project costs." },
+  },
 };
 
-type ModeOptionLabels = Record<string, LabelSet>;
-
-export function getCycleModeFieldLabel(mode: ExperienceMode): LabelSet {
-  if (mode === "professional") {
-    return {
-      label: "Cycle Mode",
-      description: "How this scheme is structured over time.",
-    };
-  }
-
-  return {
-    label: "When will this fund run?",
-    description:
-      "Choose whether this fund runs for a set period, stays open, or is linked to a project.",
-  };
-}
-
-export function getContributionModeFieldLabel(mode: ExperienceMode): LabelSet {
-  if (mode === "professional") {
-    return {
-      label: "Contribution Mode",
-      description: "How contributions are expected from participants.",
-    };
-  }
-
-  return {
-    label: "How will people contribute?",
-    description:
-      "Choose whether members contribute monthly, when needed, voluntarily, or toward a target.",
-  };
-}
-
-export function getLoanModeFieldLabel(mode: ExperienceMode): LabelSet {
-  if (mode === "professional") {
-    return {
-      label: "Loan Mode",
-      description: "Whether loans are enabled and how they are backed.",
-    };
-  }
-
-  return {
-    label: "Will this fund give loans?",
-    description:
-      "Choose whether members can borrow from this fund, or whether borrowing is disabled.",
-  };
-}
-
-export function getPayoutModeFieldLabel(mode: ExperienceMode): LabelSet {
-  if (mode === "professional") {
-    return {
-      label: "Payout Mode",
-      description: "How money is eventually paid out or used.",
-    };
-  }
-
-  return {
-    label: "What happens to the money?",
-    description:
-      "Choose whether money is shared, paid to a beneficiary, spent on a project, or kept in the fund.",
-  };
-}
-
-export function getCycleModeOptionLabels(
-  mode: ExperienceMode,
-): ModeOptionLabels {
-  if (mode === "professional") {
-    return {
-      FIXED_PERIOD: {
-        label: "Fixed Period",
-        description: "Runs for a defined start and end period.",
-      },
-      OPEN_ENDED: {
-        label: "Open Ended",
-        description: "Continues until manually stopped.",
-      },
-      PROJECT_BASED: {
-        label: "Project Based",
-        description: "Linked to a project or target.",
-      },
-    };
-  }
-
-  return {
+const community: Record<SchemeModeField, Record<string, ModeOption>> = {
+  cycleMode: {
     FIXED_PERIOD: {
       label: "Runs for a set time",
-      description: "Good for annual savings groups or fixed membership periods.",
+      description: "Good for yearly savings groups and fixed membership periods.",
     },
     OPEN_ENDED: {
-      label: "Ongoing",
-      description: "Good for burial societies, welfare funds, and long-running groups.",
+      label: "Keeps going",
+      description: "Good for burial societies, welfare funds and long-running groups.",
     },
     PROJECT_BASED: {
-      label: "Project-based",
-      description: "Good when collecting money for a specific goal or project.",
+      label: "Tied to a project",
+      description: "Good when you're collecting for one specific goal.",
     },
-  };
-}
-
-export function getContributionModeOptionLabels(
-  mode: ExperienceMode,
-): ModeOptionLabels {
-  if (mode === "professional") {
-    return {
-      MONTHLY_FIXED: {
-        label: "Monthly Fixed",
-        description: "Members contribute a fixed amount monthly.",
-      },
-      EVENT_TRIGGERED: {
-        label: "Event Triggered",
-        description: "Contributions are requested when an event happens.",
-      },
-      VOLUNTARY: {
-        label: "Voluntary",
-        description: "Members contribute when they can.",
-      },
-      PROJECT_TARGET: {
-        label: "Project Target",
-        description: "Contributions are collected toward a target.",
-      },
-    };
-  }
-
-  return {
+  },
+  contributionMode: {
     MONTHLY_FIXED: {
       label: "Same amount every month",
       description: "Good for savings clubs and regular membership contributions.",
     },
     EVENT_TRIGGERED: {
       label: "Collected when needed",
-      description: "Good for welfare, emergencies, funerals, or support events.",
+      description: "Good for welfare, emergencies and funerals.",
     },
     VOLUNTARY: {
       label: "Members give when they can",
-      description: "Good for church funds, donations, or flexible giving.",
+      description: "Good for church funds, donations and flexible giving.",
     },
     PROJECT_TARGET: {
       label: "Collected toward a target",
-      description: "Good for development projects, equipment, trips, or building funds.",
+      description: "Good for buildings, equipment, trips and development projects.",
     },
-  };
-}
-
-export function getLoanModeOptionLabels(mode: ExperienceMode): ModeOptionLabels {
-  if (mode === "professional") {
-    return {
-      DISABLED: {
-        label: "Disabled",
-        description: "Loans are not allowed.",
-      },
-      SELF_BACKED: {
-        label: "Self-backed",
-        description: "Loans are secured by the member's own savings.",
-      },
-      PEER_FUNDED: {
-        label: "Peer-funded",
-        description: "Loans are supported by group funds.",
-      },
-      SELF_AND_PEER_FUNDED: {
-        label: "Self and Peer-funded",
-        description: "Hybrid loan support model.",
-      },
-    };
-  }
-
-  return {
-    DISABLED: {
-      label: "No loans",
-      description: "This fund will only collect and track money.",
-    },
+  },
+  loanMode: {
+    DISABLED: { label: "No loans", description: "The fund only collects and keeps track of money." },
     SELF_BACKED: {
-      label: "Borrow from own savings",
-      description: "Members can borrow based on what they have saved.",
+      label: "Borrow from your own savings",
+      description: "Members can borrow up to what they have saved.",
     },
     PEER_FUNDED: {
-      label: "Borrow from group support",
-      description: "Members can borrow from money supported by the group.",
+      label: "Borrow with the group's backing",
+      description: "Other members pledge money behind each loan.",
     },
     SELF_AND_PEER_FUNDED: {
-      label: "Own savings + group support",
-      description: "Members can borrow using both personal savings and group support.",
+      label: "Own savings plus the group's backing",
+      description: "A loan uses the member's savings first, then pledges from others.",
     },
-  };
-}
-
-export function getPayoutModeOptionLabels(
-  mode: ExperienceMode,
-): ModeOptionLabels {
-  if (mode === "professional") {
-    return {
-      END_OF_CYCLE: {
-        label: "End of Cycle",
-        description: "Money is distributed when the cycle ends.",
-      },
-      NO_PAYOUT: {
-        label: "No Payout",
-        description: "Money is retained or tracked without distribution.",
-      },
-      EVENT_BENEFICIARY: {
-        label: "Event Beneficiary",
-        description: "Money is paid to a beneficiary when an event occurs.",
-      },
-      PROJECT_EXPENSE: {
-        label: "Project Expense",
-        description: "Money is spent on project costs.",
-      },
-    };
-  }
-
-  return {
+  },
+  payoutMode: {
     END_OF_CYCLE: {
-      label: "Shared at the end",
-      description: "Good for savings clubs where members receive money later.",
+      label: "Shared out at the end",
+      description: "Good for savings clubs where members get their money later.",
     },
-    NO_PAYOUT: {
-      label: "No payout",
-      description: "Good when the fund keeps money for long-term use.",
-    },
+    NO_PAYOUT: { label: "Stays in the fund", description: "Good when the fund keeps its money for the long term." },
     EVENT_BENEFICIARY: {
-      label: "Paid to affected person or family",
-      description: "Good for burial, welfare, or emergency support funds.",
+      label: "Paid to the person or family affected",
+      description: "Good for burial, welfare and emergency support.",
     },
     PROJECT_EXPENSE: {
       label: "Paid toward project costs",
-      description: "Good for building, equipment, transport, or development projects.",
+      description: "Good for building, equipment, transport and development.",
     },
-  };
+  },
+};
+
+export function getModeOptions(
+  mode: ExperienceMode,
+  field: SchemeModeField,
+): Record<string, ModeOption> {
+  return (mode === "professional" ? professional : community)[field];
+}
+
+export function getModeOption(
+  mode: ExperienceMode,
+  field: SchemeModeField,
+  value: string | undefined,
+): ModeOption | undefined {
+  return value ? getModeOptions(mode, field)[value] : undefined;
+}
+
+/** A one-line description of how a scheme runs, for list rows: "Runs for a set time · Same amount every month · No loans". */
+export function summariseModes(
+  mode: ExperienceMode,
+  values: Partial<Record<SchemeModeField, string>>,
+): string {
+  return (["cycleMode", "contributionMode", "loanMode"] as const)
+    .map((field) => getModeOption(mode, field, values[field])?.label)
+    .filter(Boolean)
+    .join(" · ");
 }

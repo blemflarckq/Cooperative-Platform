@@ -5,7 +5,11 @@ import { TenantUserRole } from "../../identity/entities/tenant-user-role.entity"
 import { Loan } from "../../loans/entities/loan.entity";
 import { LoanStatus } from "../../loans/enums/loan.enums";
 import { CycleParticipant } from "../../schemes/entities/cycle-participant.entity";
-import { CycleParticipantStatus, OperatingCycleStatus } from "../../schemes/enums/scheme.enums";
+import {
+  CycleParticipantStatus,
+  OperatingCycleStatus,
+  SchemeStatus,
+} from "../../schemes/enums/scheme.enums";
 import { ContributionSource } from "../../accounting/enums/contribution.enums";
 import { RecordedPayment } from "../entities/recorded-payment.entity";
 import { RecordedPaymentStatus } from "../enums/recorded-payment.enums";
@@ -187,7 +191,11 @@ export class PaymentAllocationService {
     });
 
     const remainderTargets: RemainderTarget[] = participations
-      .filter((participation) => participation.cycle?.status === OperatingCycleStatus.OPEN)
+      .filter(
+        (participation) =>
+          participation.cycle?.status === OperatingCycleStatus.OPEN &&
+          participation.cycle.scheme?.status === SchemeStatus.ACTIVE,
+      )
       .map((participation) => ({
         cycleId: participation.cycleId,
         schemeId: participation.cycle.schemeId,

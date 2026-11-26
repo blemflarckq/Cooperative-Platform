@@ -19,6 +19,7 @@ import {
   OperatingCycleStatus,
 } from "../enums/scheme.enums";
 import { SchemesOutboxService } from "./schemes-outbox.service";
+import { assertSchemeAcceptsNewActivity } from "./scheme-governance";
 
 @Injectable()
 export class CycleParticipantsService {
@@ -54,6 +55,8 @@ export class CycleParticipantsService {
           "Participants can only be enrolled into draft or open cycles.",
         );
       }
+
+      await assertSchemeAcceptsNewActivity(manager, tenantId, cycle.schemeId);
 
       const tenantUser = await manager.findOne(TenantUser, {
         where: {
@@ -155,6 +158,8 @@ export class CycleParticipantsService {
           "Participants can only be enrolled into draft or open cycles.",
         );
       }
+
+      await assertSchemeAcceptsNewActivity(manager, tenantId, cycle.schemeId);
 
       const tenantUsers = await manager.find(TenantUser, {
         where: uniqueTenantUserIds.map((id) => ({

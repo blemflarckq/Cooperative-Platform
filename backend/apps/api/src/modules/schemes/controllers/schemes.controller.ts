@@ -58,7 +58,8 @@ export class SchemesController {
     @Param("id") id: string,
   ) {
     const entity = await this.schemesService.findOne(tenantId, id);
-    return SchemeResponseMapper.toResponse(entity);
+    const blockers = await this.schemesService.getArchiveBlockers(tenantId, id);
+    return SchemeResponseMapper.toResponse(entity, blockers);
   }
 
   @Patch(":id")

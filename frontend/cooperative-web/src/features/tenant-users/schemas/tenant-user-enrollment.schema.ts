@@ -21,7 +21,7 @@ export const tenantUserEnrollmentSchema = z
     
     enrollmentMethod: z.enum(["invitation", "temporary-password"]),
     temporaryPassword: z.string().optional(),
-    roleIds: z.array(z.string()),
+    roleIds: z.array(z.string()).min(1, "Pick at least one role"),
   })
   .superRefine((values, ctx) => {
     if (values.enrollmentMethod === "temporary-password") {

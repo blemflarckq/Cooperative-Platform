@@ -1,175 +1,98 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
+import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/api/api-error";
 import { useExperienceMode } from "@/lib/experience/useExperienceMode";
 import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
 
-import { FundSetupReviewCard } from "../components/FundSetupReviewCard";
 import { FundTemplateSelector } from "../components/FundTemplateSelector";
 import { SchemeForm } from "../components/SchemeForm";
-import { SelectedFundTemplateSummary } from "../components/SelectedFundTemplateSummary";
+import { FUND_TEMPLATES } from "../constants/fund-templates";
 import { useCreateScheme } from "../hooks/useCreateScheme";
+import { useSchemeWords } from "../hooks/useSchemeWords";
 import { type SchemeFormValues } from "../schemas/scheme.schema";
 import { type FundTemplateId } from "../types/fund-template.types";
 import { getTemplateFormValues } from "../utils/get-template-form-values";
 
-type CommunityCreateStep = "template" | "details" | "review";
-
+/**
+ * Two steps: what is it for, then name it. The first choice fills in
+ * sensible rules (shown in plain words on the second step, changeable),
+ * so most groups never open the rules at all. After creating, you land on
+ * the new one — where the next step, activating it, is waiting.
+ */
 export function CreateSchemePage() {
-  const { isCommunityMode } = useExperienceMode();
-  const { navigateToApp } = useTenantNavigation();
+  const { isProfessionalMode } = useExperienceMode();
+  const { navigateToApp, appPath } = useTenantNavigation();
+  const words = useSchemeWords();
   const createScheme = useCreateScheme();
 
-  const [step, setStep] = useState<CommunityCreateStep>("template");
-  const [selectedTemplateId, setSelectedTemplateId] =
-    useState<FundTemplateId>("savings_club");
-  const [draftValues, setDraftValues] = useState<SchemeFormValues | null>(null);
+  const [templateId, setTemplateId] = useState<FundTemplateId | null>(null);
+  const template = FUND_TEMPLATES.find((item) => item.id === templateId);
 
   const defaultValues = useMemo(
-    () => getTemplateFormValues(selectedTemplateId),
-    [selectedTemplateId],
+    () => (templateId ? getTemplateFormValues(templateId) : {}),
+    [templateId],
   );
 
-  async function createSchemeFromValues(values: SchemeFormValues) {
-    await createScheme.mutateAsync({
-      ...values,
-      code: values.code?.trim() ? values.code.trim() : undefined,
-    });
-
-    navigateToApp("/schemes");
+  async function handleSubmit(values: SchemeFormValues) {
+    try {
+      const scheme = await createScheme.mutateAsync({
+        ...values,
+        description: values.description?.trim() || undefined,
+        code: values.code?.trim() || undefined,
+      });
+      toast.success(`${words.Noun} created`);
+      navigateToApp(`/schemes/${scheme.id}`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    }
   }
 
-  async function handleProfessionalSubmit(values: SchemeFormValues) {
-    await createSchemeFromValues(values);
-  }
-
-  function handleCommunityDetailsSubmit(values: SchemeFormValues) {
-    setDraftValues(values);
-    setStep("review");
-  }
-
-  async function handleCommunityFinalSubmit() {
-    if (!draftValues) return;
-    await createSchemeFromValues(draftValues);
-  }
-
-  function handleTemplateChange(templateId: FundTemplateId) {
-    setSelectedTemplateId(templateId);
-    setDraftValues(null);
-  }
-
-  if (!isCommunityMode) {
+  if (!templateId || !template) {
     return (
-      <div>
+      <PageContainer>
         <PageHeader
-          title="Create Scheme"
-          description="Create a new scheme and configure its operating rules."
-          backTo="/schemes"
+          title={`New ${words.noun}`}
+          description="What is it for? Pick the closest one — you can still change the details next."
+          backTo={appPath("/schemes")}
+          backLabel={words.Plural}
         />
-
-        <SchemeForm
-          onSubmit={handleProfessionalSubmit}
-          submitLabel="Create Scheme"
-        />
-      </div>
+        <FundTemplateSelector onSelect={setTemplateId} />
+      </PageContainer>
     );
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Create Group Fund"
-        description="Choose what your group is trying to achieve, then review the setup before saving."
-        backTo="/schemes"
+    <PageContainer>
+      <PageHeader title={`Name your ${words.noun}`} />
+
+      <Card className="flex-row items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0">
+        <div className="min-w-0">
+          <div className="text-xs text-[var(--muted-foreground)]">Type</div>
+          <div className="text-sm font-medium">{template.title}</div>
+        </div>
+        <Button type="button" variant="ghost" onClick={() => setTemplateId(null)} disabled={createScheme.isPending}>
+          <ArrowLeft className="mr-1.5 size-4" />
+          Change type
+        </Button>
+      </Card>
+
+      <SchemeForm
+        // A fresh form for each type, so its rules and description start from that type.
+        key={templateId}
+        defaultValues={defaultValues}
+        rulesOpen={isProfessionalMode || templateId === "custom"}
+        submitLabel={`Create ${words.noun}`}
+        savingLabel="Creating…"
+        isLoading={createScheme.isPending}
+        onSubmit={(values) => void handleSubmit(values)}
+        onCancel={() => navigateToApp("/schemes")}
       />
-
-      {step === "template" ? (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--foreground)]">
-              What are you trying to achieve?
-            </h2>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Pick the option closest to your group. You can still adjust the
-              details before saving.
-            </p>
-          </div>
-
-          <FundTemplateSelector
-            value={selectedTemplateId}
-            onChange={handleTemplateChange}
-          />
-
-          <div className="flex justify-end">
-            <Button type="button" onClick={() => setStep("details")}>
-              Continue
-              <ArrowRight className="ml-2 size-4" />
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {step === "details" ? (
-        <div className="space-y-6">
-          <SelectedFundTemplateSummary templateId={selectedTemplateId} />
-
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--foreground)]">
-              Fund Details
-            </h2>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Give your fund a clear name and confirm how it should operate.
-            </p>
-          </div>
-
-          <SchemeForm
-            defaultValues={draftValues ?? defaultValues}
-            onSubmit={handleCommunityDetailsSubmit}
-            submitLabel="Review Setup"
-          />
-
-          <div className="flex justify-start">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setStep("template")}
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              Change Template
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {step === "review" && draftValues ? (
-        <div className="space-y-6">
-          <FundSetupReviewCard
-            templateId={selectedTemplateId}
-            values={draftValues}
-          />
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setStep("details")}
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              Back to Details
-            </Button>
-
-            <Button
-              type="button"
-              onClick={handleCommunityFinalSubmit}
-              disabled={createScheme.isPending}
-            >
-              {createScheme.isPending ? "Creating..." : "Create Group Fund"}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
+    </PageContainer>
   );
 }

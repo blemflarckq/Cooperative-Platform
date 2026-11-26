@@ -15,9 +15,9 @@ import { ListOperatingCyclesQueryDto } from "../dto/operating-cycles/list-operat
 import {
   CycleMode,
   OperatingCycleStatus,
-  SchemeStatus,
 } from "../enums/scheme.enums";
 import { SchemesOutboxService } from "./schemes-outbox.service";
+import { assertSchemeAcceptsNewActivity } from "./scheme-governance";
 import { assertPositiveMoneyString } from "../../../common/validation/money";
 import { slugifyCode } from "../../../common/utils/code-generator";
 
@@ -39,23 +39,14 @@ export class OperatingCyclesService {
     actorUserId?: string,
   ): Promise<OperatingCycle> {
     return this.dataSource.transaction(async (manager) => {
-      const scheme = await manager.findOne(CooperativeScheme, {
-        where: {
-          id: schemeId,
-          tenantId,
-          isActive: true,
-        },
-      });
-
-      if (!scheme) {
-        throw new NotFoundException("Scheme not found.");
-      }
-
-      if (scheme.status !== SchemeStatus.ACTIVE) {
-        throw new BadRequestException(
-          "Cycles can only be created under an active scheme.",
-        );
-      }
+      // Same question every "new activity" path asks. It also fixes a
+      // misleading answer: a suspended scheme used to look "not found"
+      // here because the lookup filtered on isActive.
+      const scheme = await assertSchemeAcceptsNewActivity(
+        manager,
+        tenantId,
+        schemeId,
+      );
 
       this.validateCycleDatesForMode(
         scheme.cycleMode,
@@ -466,6 +457,13 @@ export class OperatingCyclesService {
       }
 
       this.assertValidStatusTransition(cycle.status, nextStatus);
+
+      // Opening (or resuming) a cycle starts new activity, so the scheme
+      // has to be active. Pausing, closing and cancelling are always
+      // allowed — winding things down must never be blocked.
+      if (nextStatus === OperatingCycleStatus.OPEN) {
+        await assertSchemeAcceptsNewActivity(manager, tenantId, cycle.schemeId);
+      }
 
       const previousStatus = cycle.status;
       cycle.status = nextStatus;

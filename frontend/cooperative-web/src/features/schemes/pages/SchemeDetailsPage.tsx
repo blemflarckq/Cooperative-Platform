@@ -1,568 +1,421 @@
-import { CheckCircle2, ClipboardCheck, HandCoins, Pencil, Percent, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
 
 import { ConfirmActionDialog } from "@/components/common/ConfirmActionDialog";
-import { NextActionCard } from "@/components/common/NextActionCard";
+import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { PermissionGate } from "@/components/common/PermissionGate";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { PaginationFooter } from "@/components/data-display/PaginationFooter";
-import { TableToolbar } from "@/components/data-display/TableToolbar";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { LoadingState } from "@/components/feedback/LoadingState";
-import { Breadcrumbs } from "@/components/navigation/BreadCrumbs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { resolveSchemeNextAction } from "@/lib/domain/next-action";
-import { useTerminology } from "@/lib/domain/useTerminology";
-import { useExperienceMode } from "@/lib/experience/useExperienceMode";
+import { Card } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { formatDate } from "@/lib/formatting/date";
 import { useTenantNavigation } from "@/lib/navigation/useTenantNavigation";
+import { cn } from "@/lib/utils/cn";
 
 import { useCyclesByScheme } from "@/features/cycles/hooks/useCyclesByScheme";
+import { SchemeRulesList } from "../components/SchemeRulesList";
+import { SchemeStatusBadge } from "../components/SchemeStatusBadge";
 import { useScheme } from "../hooks/useScheme";
 import { useSchemeTransition } from "../hooks/useSchemeTransition";
-import { getFundRuleSummary } from "../utils/get-fund-rule-summary";
+import { useSchemeWords } from "../hooks/useSchemeWords";
+import {
+  describeArchiveBlockers,
+  isStructureLocked,
+  joinPhrases,
+  SUSPEND_EFFECT,
+} from "../utils/scheme-state";
 
-const communityCycleStatusOptions = [
-  { value: "DRAFT", label: "Not Started" },
-  { value: "OPEN", label: "Collecting Money" },
-  { value: "PAUSED", label: "Temporarily Paused" },
-  { value: "CLOSED", label: "Completed" },
-  { value: "CANCELLED", label: "Cancelled" },
-];
+const cardClass =
+  "gap-0 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-none ring-0";
 
-const professionalCycleStatusOptions = [
-  { value: "DRAFT", label: "Draft" },
-  { value: "OPEN", label: "Open" },
-  { value: "PAUSED", label: "Paused" },
-  { value: "CLOSED", label: "Closed" },
-  { value: "CANCELLED", label: "Cancelled" },
-];
+/** Cycles are fetched in one go and revealed ten at a time. */
+const CYCLE_FETCH = 50;
+const CYCLE_PAGE = 10;
 
+/**
+ * One scheme, and what to do next with it. A single accent action at a
+ * time, in the "next step" card (activate it, create its first cycle,
+ * open it); the header holds only Edit. Everything that can't be done is
+ * said where the action would have been, with the reason, instead of a
+ * button that doesn't work.
+ */
 export function SchemeDetailsPage() {
   const { schemeId } = useParams<{ schemeId: string }>();
   const navigate = useNavigate();
-  const { appPath } = useTenantNavigation();
-  const { isCommunityMode } = useExperienceMode();
-  const t = useTerminology();
+  const { navigateToApp, appPath } = useTenantNavigation();
+  const { hasPermission } = useAuth();
+  const words = useSchemeWords();
 
-  const [cyclePage, setCyclePage] = useState(1);
-  const [cycleSearch, setCycleSearch] = useState("");
-  const [cycleStatus, setCycleStatus] = useState("");
+  const [visibleCycles, setVisibleCycles] = useState(CYCLE_PAGE);
 
   const schemeQuery = useScheme(schemeId!);
-  const transitionMutation = useSchemeTransition();
+  const cyclesQuery = useCyclesByScheme(schemeId!, { page: 1, limit: CYCLE_FETCH });
+  const transition = useSchemeTransition();
 
-  const cyclesQuery = useCyclesByScheme(schemeId!, {
-    page: cyclePage,
-    limit: 10,
-    search: cycleSearch,
-    status: cycleStatus,
-  });
-
-  const cycles = cyclesQuery.data?.data ?? [];
-  const cyclesMeta = cyclesQuery.data?.meta;
-
-  if (schemeQuery.isLoading) return <LoadingState />;
+  if (schemeQuery.isLoading) {
+    return (
+      <PageContainer>
+        <LoadingState />
+      </PageContainer>
+    );
+  }
 
   if (schemeQuery.isError || !schemeQuery.data) {
     return (
-      <ErrorState
-        title={
-          isCommunityMode
-            ? "Could not load group fund"
-            : "Could not load scheme"
-        }
-      />
+      <PageContainer>
+        <ErrorState
+          title={`Could not load this ${words.noun}`}
+          description="It may have been removed, or the connection dropped. Go back and try again."
+        />
+      </PageContainer>
     );
   }
 
   const scheme = schemeQuery.data;
+  const cycles = cyclesQuery.data?.data ?? [];
+  const cycleTotal = cyclesQuery.data?.meta.total ?? cycles.length;
+  const hasOpenCycle = cycles.some((cycle) => cycle.status === "OPEN");
   const latestCycle = cycles[0];
 
-  const rules = getFundRuleSummary({
-    cycleMode: scheme.cycleMode,
-    contributionMode: scheme.contributionMode,
-    loanMode: scheme.loanMode,
-    payoutMode: scheme.payoutMode,
-  });
+  const isDraft = scheme.status === "DRAFT";
+  const isActive = scheme.status === "ACTIVE";
+  const isSuspended = scheme.status === "SUSPENDED";
+  const isArchived = scheme.status === "ARCHIVED";
+  const offersLoans = scheme.loanMode !== "DISABLED";
 
-  const cycleStatusOptions = isCommunityMode
-    ? communityCycleStatusOptions
-    : professionalCycleStatusOptions;
+  const mayEdit = hasPermission(["scheme:update"]) && !isArchived;
+  const mayActivate = hasPermission(["scheme:activate"]);
+  const maySuspend = hasPermission(["scheme:suspend"]);
+  const mayArchive = hasPermission(["scheme:archive"]);
+  const mayCreateCycle = hasPermission(["cycle:create"]);
 
-  const nextAction = resolveSchemeNextAction({
-    schemeId: scheme.id,
-    schemeStatus: scheme.status,
-    cycleCount: cyclesMeta?.total ?? cycles.length,
-    latestCycleId: latestCycle?.id,
-    latestCycleStatus: latestCycle?.status,
-    isCommunityMode,
-  });
+  const blockerPhrases = describeArchiveBlockers(scheme.archiveBlockers);
+  const quote = `"${scheme.name}"`;
 
-  const pageDescription = isCommunityMode
-    ? "Review this fund, manage its activity periods, and keep your group moving together."
-    : "Review scheme policy configuration and manage operating cycles.";
+  const links = [
+    offersLoans && hasPermission(["loan:read"])
+      ? { to: `/schemes/${scheme.id}/loans`, label: "Loans", hint: "Requests and repayments" }
+      : null,
+    offersLoans && hasPermission(["loan-policy:read"])
+      ? { to: `/schemes/${scheme.id}/loan-policy`, label: "Loan terms", hint: "Interest and limits" }
+      : null,
+    // Approvals are for money going out of an active scheme; a draft has none.
+    !isDraft && hasPermission(["outbound-request:approve"])
+      ? {
+          to: `/schemes/${scheme.id}/approvals`,
+          label: words.isCommunityMode ? "Waiting on you" : "Approvals",
+          hint: "Money going out that needs sign-off",
+        }
+      : null,
+  ].filter((link): link is { to: string; label: string; hint: string } => link !== null);
 
-  const backLabel = isCommunityMode ? "Back to Group Funds" : "Back to Schemes";
+  const nextStep = resolveNextStep();
 
-  function handleActivate() {
-    transitionMutation.mutate(
-      { schemeId: scheme.id, transition: "activate" },
-      {
-        onSuccess: () =>
-          toast.success(
-            isCommunityMode ? "Group fund is ready to use" : "Scheme activated",
-          ),
-      },
-    );
+  function resolveNextStep(): {
+    title: string;
+    description: string;
+    action?: ReactNode;
+  } | null {
+    if (isArchived) {
+      return {
+        title: `This ${words.noun} is archived`,
+        description:
+          "Archived is closed for good. It takes no new activity and can't be changed, and its history is kept.",
+      };
+    }
+
+    if (isDraft) {
+      return {
+        title: `Activate this ${words.noun} to start using it`,
+        description: `Until it's active you can't create ${words.cycles} or record any money. You can still change its rules before you activate it.`,
+        action: mayActivate ? (
+          <Button
+            disabled={transition.isPending}
+            onClick={() => transition.mutate({ schemeId: scheme.id, transition: "activate" })}
+          >
+            {transition.isPending ? "Activating…" : "Activate"}
+          </Button>
+        ) : null,
+      };
+    }
+
+    if (isSuspended) {
+      return {
+        title: `This ${words.noun} is suspended`,
+        description: `It isn't taking new contributions, loan requests or members. Repayments and loans already approved carry on.`,
+        action: mayActivate ? (
+          <Button
+            disabled={transition.isPending}
+            onClick={() => transition.mutate({ schemeId: scheme.id, transition: "resume" })}
+          >
+            {transition.isPending ? "Resuming…" : "Resume"}
+          </Button>
+        ) : null,
+      };
+    }
+
+    if (cyclesQuery.isLoading || cyclesQuery.isError) return null;
+
+    if (cycleTotal === 0) {
+      return {
+        title: `Create the first ${words.cycle}`,
+        description: `A ${words.cycle} is what members join and contribute to. Nothing can be recorded until there is one.`,
+        action: mayCreateCycle ? (
+          <Button onClick={() => navigateToApp(`/schemes/${scheme.id}/cycles/new`)}>
+            New {words.cycle}
+          </Button>
+        ) : null,
+      };
+    }
+
+    if (!hasOpenCycle && latestCycle) {
+      return {
+        title: `${latestCycle.name} isn't open`,
+        description: `Open it so members can contribute.`,
+        action: (
+          <Button onClick={() => navigateToApp(`/cycles/${latestCycle.id}`)}>
+            Go to {words.cycle}
+          </Button>
+        ),
+      };
+    }
+
+    return null;
   }
 
-  function handleSuspend() {
-    transitionMutation.mutate(
-      { schemeId: scheme.id, transition: "suspend" },
-      {
-        onSuccess: () =>
-          toast.success(
-            isCommunityMode ? "Group fund suspended" : "Scheme suspended",
-          ),
-      },
-    );
-  }
-
-  function handleArchive() {
-    transitionMutation.mutate(
-      { schemeId: scheme.id, transition: "archive" },
-      {
-        onSuccess: () =>
-          toast.success(
-            isCommunityMode ? "Group fund archived" : "Scheme archived",
-          ),
-      },
-    );
-  }
+  const showStatusCard = !isArchived && ((isActive && maySuspend) || mayArchive);
 
   return (
-    <div>
-      <Breadcrumbs
-        items={[
-          {
-            label: isCommunityMode ? t.terms("scheme") : "Schemes",
-            to: "/schemes",
-          },
-          { label: scheme.name },
-        ]}
-      />
-
+    <PageContainer>
       <PageHeader
         title={scheme.name}
-        description={pageDescription}
-        backTo="/schemes"
-        backLabel={backLabel}
+        backTo={appPath("/schemes")}
+        backLabel={words.Plural}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <PermissionGate permissions={["outbound-request:approve"]}>
-              <Button
-                variant="outline"
-                onClick={() => navigate(appPath(`/schemes/${scheme.id}/approvals`))}
-              >
-                <ClipboardCheck className="mr-2 size-4" />
-                {isCommunityMode ? "Waiting on you" : "Approvals"}
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["loan:read"]}>
-              <Button
-                variant="outline"
-                onClick={() => navigate(appPath(`/schemes/${scheme.id}/loans`))}
-              >
-                <HandCoins className="mr-2 size-4" />
-                Loans
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["loan-policy:read"]}>
-              <Button
-                variant="outline"
-                onClick={() => navigate(appPath(`/schemes/${scheme.id}/loan-policy`))}
-              >
-                <Percent className="mr-2 size-4" />
-                Loan terms
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["scheme:update"]}>
-              <Button
-                variant="outline"
-                onClick={() => navigate(appPath(`/schemes/${scheme.id}/edit`))}
-              >
-                <Pencil className="mr-2 size-4" />
-                {isCommunityMode ? "Edit Fund" : "Edit"}
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["scheme:activate"]}>
-              <Button
-                onClick={handleActivate}
-                disabled={
-                  scheme.status !== "DRAFT" || transitionMutation.isPending
-                }
-              >
-                <CheckCircle2 className="mr-2 size-4" />
-                {isCommunityMode ? "Activate Fund" : "Activate"}
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["cycle:create"]}>
-              <Button
-                variant="outline"
-                disabled={scheme.status !== "ACTIVE"}
-                onClick={() =>
-                  navigate(appPath(`/schemes/${scheme.id}/cycles/new`))
-                }
-              >
-                <Plus className="mr-2 size-4" />
-                {isCommunityMode ? "Create Activity Period" : "Create Cycle"}
-              </Button>
-            </PermissionGate>
-
-            <PermissionGate permissions={["scheme:suspend"]}>
-              <ConfirmActionDialog
-                title={
-                  isCommunityMode
-                    ? "Suspend group fund?"
-                    : "Suspend scheme?"
-                }
-                description={
-                  isCommunityMode
-                    ? "This will pause new activity for this group fund."
-                    : "This will suspend the scheme and may prevent new operational activity."
-                }
-                confirmLabel={
-                  isCommunityMode ? "Suspend Group Fund" : "Suspend Scheme"
-                }
-                onConfirm={handleSuspend}
-                trigger={
-                  <Button
-                    variant="outline"
-                    disabled={
-                      scheme.status !== "ACTIVE" ||
-                      transitionMutation.isPending
-                    }
-                    className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                  >
-                    {isCommunityMode ? "Suspend Fund" : "Suspend"}
-                  </Button>
-                }
-              />
-            </PermissionGate>
-
-            <PermissionGate permissions={["scheme:archive"]}>
-              <ConfirmActionDialog
-                title={
-                  isCommunityMode ? "Archive group fund?" : "Archive scheme?"
-                }
-                description={
-                  isCommunityMode
-                    ? "This will archive the group fund and hide it from normal active work."
-                    : "This will archive the scheme and may prevent new operational activity."
-                }
-                confirmLabel={
-                  isCommunityMode ? "Archive Group Fund" : "Archive Scheme"
-                }
-                onConfirm={handleArchive}
-                trigger={
-                  <Button
-                    variant="outline"
-                    disabled={
-                      scheme.status !== "ACTIVE" ||
-                      transitionMutation.isPending
-                    }
-                    className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                  >
-                    {isCommunityMode ? "Archive Fund" : "Archive"}
-                  </Button>
-                }
-              />
-            </PermissionGate>
-          </div>
+          mayEdit ? (
+            <Button variant="outline" onClick={() => navigateToApp(`/schemes/${scheme.id}/edit`)}>
+              <Pencil className="mr-1.5 size-4" />
+              Edit
+            </Button>
+          ) : null
         }
       />
 
-      <div className="mb-6">
-        <NextActionCard
-          action={nextAction}
-          onAction={
-            nextAction.kind === "activate_scheme" ? handleActivate : undefined
-          }
-          disabled={
-            nextAction.kind === "activate_scheme" &&
-            (scheme.status !== "DRAFT" || transitionMutation.isPending)
-          }
-        />
-      </div>
-
-      {isCommunityMode ? (
-        <CommunitySchemeDetails
-          scheme={scheme}
-          rules={rules}
-          cycleCount={cyclesMeta?.total ?? cycles.length}
-        />
-      ) : (
-        <ProfessionalSchemeDetails scheme={scheme} />
-      )}
-
-      <div className="mt-6">
-        <Card className="overflow-hidden border-[var(--border)] bg-[var(--card)]">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>
-                {isCommunityMode ? t.terms("cycle") : "Operating Cycles"}
-              </CardTitle>
-
-              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                {isCommunityMode
-                  ? "Manage activity periods created under this group fund."
-                  : "Manage cycles created under this scheme."}
-              </p>
-            </div>
-
-            <PermissionGate permissions={["cycle:create"]}>
-              <Button
-                variant="outline"
-                disabled={scheme.status !== "ACTIVE"}
-                onClick={() =>
-                  navigate(appPath(`/schemes/${scheme.id}/cycles/new`))
-                }
-              >
-                <Plus className="mr-2 size-4" />
-                {isCommunityMode ? "Create Activity Period" : "Create Cycle"}
-              </Button>
-            </PermissionGate>
-          </CardHeader>
-
-          <TableToolbar
-            searchValue={cycleSearch}
-            onSearchChange={(value) => {
-              setCycleSearch(value);
-              setCyclePage(1);
-            }}
-            searchPlaceholder={
-              isCommunityMode
-                ? "Search activity periods by name or code..."
-                : "Search cycles by name or code..."
-            }
-            filters={
-              <Select
-                value={cycleStatus || "all"}
-                onValueChange={(value) => {
-                  setCycleStatus(value === "all" ? "" : value);
-                  setCyclePage(1);
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-44">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-
-                  {cycleStatusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            }
+      <Card className={cardClass}>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-sm font-medium">About it</h2>
+          <SchemeStatusBadge status={scheme.status} />
+        </div>
+        <p
+          className={cn(
+            "mt-2 text-sm leading-6",
+            scheme.description ? "" : "text-[var(--muted-foreground)]",
+          )}
+        >
+          {scheme.description || "No description yet"}
+        </p>
+        <dl className="mt-3 grid grid-cols-2 gap-3">
+          <Fact label="Code" value={scheme.code} />
+          <Fact
+            label={scheme.activatedAt ? "Active since" : "Created"}
+            value={formatDate(scheme.activatedAt ?? scheme.createdAt)}
           />
+        </dl>
+      </Card>
 
-          <CardContent className="p-0">
-            {cyclesQuery.isLoading ? (
-              <div className="p-6">
-                <LoadingState />
+      {nextStep ? (
+        <Card className={cardClass}>
+          <h2 className="text-sm font-medium">{nextStep.title}</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{nextStep.description}</p>
+          {nextStep.action ? <div className="mt-3">{nextStep.action}</div> : null}
+          {nextStep.action === null ? (
+            <p className="mt-3 text-xs text-[var(--muted-foreground)]">
+              {isDraft || isSuspended
+                ? "An administrator or treasurer can do this."
+                : `Someone with permission to manage ${words.cycles} can do this.`}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <Card className={cardClass}>
+        <h2 className="text-sm font-medium">How it works</h2>
+        <div className="mt-3">
+          <SchemeRulesList values={scheme} />
+        </div>
+        {isStructureLocked(scheme.status) ? (
+          <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs leading-5 text-[var(--muted-foreground)]">
+            Fixed once a {words.noun} is activated, because its {words.cycles}, contributions and
+            loans are built on these. The name and description can still change.
+          </p>
+        ) : null}
+      </Card>
+
+      {links.length > 0 ? (
+        <Card className={cn(cardClass, "p-0")}>
+          {links.map((link, index) => (
+            <button
+              key={link.to}
+              type="button"
+              onClick={() => navigate(appPath(link.to))}
+              className={cn(
+                "flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)]/20",
+                index === 0 ? "rounded-t-2xl" : "border-t border-[var(--border)]",
+                index === links.length - 1 ? "rounded-b-2xl" : "",
+              )}
+            >
+              <div>
+                <div className="text-sm font-medium">{link.label}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">{link.hint}</div>
               </div>
-            ) : cyclesQuery.isError ? (
-              <div className="p-6">
-                <ErrorState
-                  title={
-                    isCommunityMode
-                      ? "Could not load activity periods"
-                      : "Could not load cycles"
-                  }
-                />
-              </div>
-            ) : cycles.length === 0 ? (
-              <div className="p-6 text-sm text-[var(--muted-foreground)]">
-                {isCommunityMode
-                  ? "No activity periods match the current filters."
-                  : "No operating cycles match the current filters."}
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border)]">
-                {cycles.map((cycle) => (
+              <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
+            </button>
+          ))}
+        </Card>
+      ) : null}
+
+      <Card className={cardClass}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium">{words.Cycles}</h2>
+          {isActive && mayCreateCycle && cycleTotal > 0 ? (
+            <Button variant="outline" onClick={() => navigateToApp(`/schemes/${scheme.id}/cycles/new`)}>
+              New {words.cycle}
+            </Button>
+          ) : null}
+        </div>
+
+        {cyclesQuery.isLoading ? (
+          <div className="mt-3">
+            <LoadingState />
+          </div>
+        ) : cyclesQuery.isError ? (
+          <p className="mt-3 text-sm text-[var(--muted-foreground)]">
+            Could not load the {words.cycles}. Reload the page to try again.
+          </p>
+        ) : cycles.length === 0 ? (
+          <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
+            None yet.{" "}
+            {isActive
+              ? `Members join and contribute through a ${words.cycle}.`
+              : `${words.Cycles} can be created once the ${words.noun} is active.`}
+          </p>
+        ) : (
+          <>
+            <ul className="mt-2 divide-y divide-[var(--border)]">
+              {cycles.slice(0, visibleCycles).map((cycle) => (
+                <li key={cycle.id}>
                   <button
-                    key={cycle.id}
                     type="button"
                     onClick={() => navigate(appPath(`/cycles/${cycle.id}`))}
-                    className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition hover:bg-[var(--secondary)]"
+                    className="flex w-full items-center justify-between gap-3 py-3 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)]/20"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-[var(--foreground)]">
-                        {cycle.name}
-                      </p>
-
-                      <p className="truncate text-sm text-[var(--muted-foreground)]">
-                        {cycle.code}
-                      </p>
+                      <div className="truncate text-sm font-medium">{cycle.name}</div>
+                      {cycle.startsOn || cycle.endsOn ? (
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          {[cycle.startsOn, cycle.endsOn]
+                            .map((date) => (date ? formatDate(date) : "open"))
+                            .join(" – ")}
+                        </div>
+                      ) : null}
                     </div>
-
                     <StatusBadge status={cycle.status} />
                   </button>
-                ))}
+                </li>
+              ))}
+            </ul>
+            {cycles.length > visibleCycles ? (
+              <div className="mt-2">
+                <Button variant="ghost" onClick={() => setVisibleCycles((count) => count + CYCLE_PAGE)}>
+                  Show more
+                </Button>
               </div>
-            )}
-
-            {cyclesMeta ? (
-              <PaginationFooter meta={cyclesMeta} onPageChange={setCyclePage} />
             ) : null}
-          </CardContent>
+            {cycleTotal > cycles.length ? (
+              <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+                Showing the latest {cycles.length} of {cycleTotal}.
+              </p>
+            ) : null}
+          </>
+        )}
+      </Card>
+
+      {showStatusCard ? (
+        <Card className={cardClass}>
+          <h2 className="text-sm font-medium">Status</h2>
+
+          {isActive && maySuspend ? (
+            <div className="mt-2">
+              <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+                {SUSPEND_EFFECT} You can resume it at any time.
+              </p>
+              <div className="mt-3">
+                <ConfirmActionDialog
+                  trigger={
+                    <Button variant="outline" disabled={transition.isPending}>
+                      Suspend {words.noun}
+                    </Button>
+                  }
+                  title={`Suspend ${quote}?`}
+                  description={`${SUSPEND_EFFECT} You can resume it at any time.`}
+                  confirmLabel="Suspend"
+                  loadingLabel="Suspending…"
+                  isLoading={transition.isPending}
+                  onConfirm={() => transition.mutate({ schemeId: scheme.id, transition: "suspend" })}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {mayArchive ? (
+            <div className={cn(isActive && maySuspend ? "mt-4 border-t border-[var(--border)] pt-4" : "mt-2")}>
+              <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+                Archiving closes it for good. It takes no new activity and can't be reopened, and its
+                history is kept.
+              </p>
+              <div className="mt-3">
+                {blockerPhrases.length > 0 ? (
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    Can't be archived yet: {joinPhrases(blockerPhrases)}. Close the {words.cycles} and settle
+                    the loans first.
+                  </p>
+                ) : (
+                  <ConfirmActionDialog
+                    trigger={
+                      <Button
+                        variant="outline"
+                        className="text-[var(--destructive)]"
+                        disabled={transition.isPending}
+                      >
+                        Archive {words.noun}
+                      </Button>
+                    }
+                    title={`Archive ${quote}?`}
+                    description="It will take no new activity, can't be reopened, and can't be edited. Its history is kept exactly as it is."
+                    confirmLabel="Archive"
+                    loadingLabel="Archiving…"
+                    variant="destructive"
+                    isLoading={transition.isPending}
+                    onConfirm={() => transition.mutate({ schemeId: scheme.id, transition: "archive" })}
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
         </Card>
-      </div>
-    </div>
+      ) : null}
+    </PageContainer>
   );
 }
 
-function CommunitySchemeDetails({
-  scheme,
-  rules,
-  cycleCount,
-}: {
-  scheme: {
-    code: string;
-    status: string;
-    description?: string | null;
-  };
-  rules: Array<{
-    id: string;
-    text: string;
-  }>;
-  cycleCount: number;
-}) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <Card className="border-[var(--border)] bg-[var(--card)]">
-        <CardHeader>
-          <CardTitle>Fund Overview</CardTitle>
-        </CardHeader>
-
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <Detail label="Fund Code" value={scheme.code} />
-          <Detail label="Status" value={<StatusBadge status={scheme.status} />} />
-          <Detail label="Activity Periods" value={cycleCount} />
-          <Detail
-            label="Description"
-            value={scheme.description || "No description provided."}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="border-[var(--border)] bg-[var(--card)]">
-        <CardHeader>
-          <CardTitle>How this fund works</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {rules.map((rule) => (
-            <Detail
-              key={rule.id}
-              label={getRuleLabel(rule.id)}
-              value={rule.text}
-            />
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function getRuleLabel(ruleId: string) {
-  switch (ruleId) {
-    case "cycleMode":
-      return "Activity Period";
-    case "contributionMode":
-      return "Money Collection";
-    case "loanMode":
-      return "Loans";
-    case "payoutMode":
-      return "Payouts";
-    default:
-      return "Rule";
-  }
-}
-
-function ProfessionalSchemeDetails({
-  scheme,
-}: {
-  scheme: {
-    code: string;
-    status: string;
-    cycleMode: string;
-    contributionMode: string;
-    loanMode: string;
-    payoutMode: string;
-    description?: string | null;
-  };
-}) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card className="border-[var(--border)] bg-[var(--card)]">
-        <CardHeader>
-          <CardTitle>Scheme Details</CardTitle>
-        </CardHeader>
-
-        <CardContent className="grid gap-5 md:grid-cols-2">
-          <Detail label="Code" value={scheme.code} />
-          <Detail label="Status" value={<StatusBadge status={scheme.status} />} />
-          <Detail label="Cycle Mode" value={scheme.cycleMode} />
-          <Detail label="Contribution Mode" value={scheme.contributionMode} />
-          <Detail label="Loan Mode" value={scheme.loanMode} />
-          <Detail label="Payout Mode" value={scheme.payoutMode} />
-        </CardContent>
-      </Card>
-
-      <Card className="border-[var(--border)] bg-[var(--card)]">
-        <CardHeader>
-          <CardTitle>Description</CardTitle>
-        </CardHeader>
-
-        <CardContent className="text-sm text-[var(--muted-foreground)]">
-          {scheme.description || "No description provided."}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: React.ReactNode }) {
+function Fact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
-        {label}
-      </p>
-
-      <div className="mt-1 text-sm font-medium text-[var(--foreground)]">
-        {value}
-      </div>
+      <dt className="text-xs text-[var(--muted-foreground)]">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm font-medium">{value}</dd>
     </div>
   );
 }

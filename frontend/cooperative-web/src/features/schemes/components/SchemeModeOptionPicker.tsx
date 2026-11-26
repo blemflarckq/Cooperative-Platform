@@ -1,50 +1,47 @@
-import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import type { ModeOption } from "../utils/scheme-mode-labels";
 
 interface SchemeModeOptionPickerProps<TValue extends string> {
+  label: string;
   value: TValue;
-  options: TValue[];
-  labels: Record<string, { label: string; description?: string }>;
+  options: Record<string, ModeOption>;
   onChange: (value: TValue) => void;
+  disabled?: boolean;
 }
 
+/**
+ * One rule, as a short list of choices. Selection is shown with the
+ * neutral foreground colour, never the accent — the screen's one accent
+ * is the button that saves.
+ */
 export function SchemeModeOptionPicker<TValue extends string>({
+  label,
   value,
   options,
-  labels,
   onChange,
+  disabled,
 }: SchemeModeOptionPickerProps<TValue>) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {options.map((option) => {
-        const selected = value === option;
-        const presentation = labels[option] ?? { label: option };
-
+    <div role="radiogroup" aria-label={label} className="grid gap-2">
+      {Object.entries(options).map(([optionValue, option]) => {
+        const selected = value === optionValue;
         return (
           <button
-            key={option}
+            key={optionValue}
             type="button"
-            onClick={() => onChange(option)}
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onChange(optionValue as TValue)}
             className={cn(
-              "relative rounded-2xl border p-4 text-left transition",
-              selected
-                ? "border-[var(--primary)] bg-[var(--secondary)] shadow-sm"
-                : "border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)]",
+              "rounded-xl border bg-[var(--card)] p-3 text-left transition-colors hover:bg-[var(--secondary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--ring)]/20 disabled:opacity-60",
+              selected ? "border-[var(--foreground)]/40 bg-[var(--secondary)]" : "border-[var(--border)]",
             )}
           >
-            {selected ? (
-              <CheckCircle2 className="absolute right-4 top-4 size-5 text-[var(--primary)]" />
-            ) : null}
-
-            <p className="pr-8 font-medium text-[var(--foreground)]">
-              {presentation.label}
-            </p>
-
-            {presentation.description ? (
-              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                {presentation.description}
-              </p>
-            ) : null}
+            <div className="text-sm font-medium">{option.label}</div>
+            <div className="mt-0.5 text-xs leading-5 text-[var(--muted-foreground)]">
+              {option.description}
+            </div>
           </button>
         );
       })}

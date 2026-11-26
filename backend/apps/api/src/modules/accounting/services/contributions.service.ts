@@ -32,6 +32,7 @@ import { AccountingSequence } from "../entities/accounting-sequence.entity";
 import { AccountingOutboxService } from "./accounting-outbox.service";
 import { ListContributionsQueryDto } from "../dto/contributions/list-contributions.query.dto";
 import { JournalEntriesService } from "./journal-entries.service";
+import { assertSchemeAcceptsNewActivity } from "../../schemes/services/scheme-governance";
 
 @Injectable()
 export class ContributionsService {
@@ -73,6 +74,10 @@ export class ContributionsService {
           "Contributions can only be posted to open cycles.",
         );
       }
+
+      // A suspended or archived scheme takes no new money, even into a
+      // cycle that was left open.
+      await assertSchemeAcceptsNewActivity(manager, tenantId, cycle.schemeId);
 
       const tenantUser = await manager.findOne(TenantUser, {
         where: {
